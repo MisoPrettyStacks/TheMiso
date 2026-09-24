@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MISOCRYPTO // Real-data crypto macro monitor</title>
+<style>
+:root{--bg:#05070a;--card:#0b1018;--line:#1e293b;--tx:#e2e8f0;--mut:#64748b;--cy:#22d3ee;--am:#fbbf24;--gr:#34d399;--rd:#f87171}
+@media(prefers-color-scheme:light){:root{--bg:#f4f6f9;--card:#fff;--line:#d5dbe4;--tx:#0f172a;--mut:#5b6678;--cy:#0e7490;--am:#b45309;--gr:#047857;--rd:#b91c1c}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;padding:12px 14px 40px;max-width:1100px;margin-inline:auto}
+h1{font-size:16px;letter-spacing:.08em;margin:6px 0}h2{font-size:12px;letter-spacing:.1em;color:var(--cy);margin:22px 0 8px}
+.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px}.m{color:var(--mut);font-size:11px}
+.row{display:flex;justify-content:space-between;gap:8px}.ok{color:var(--gr)}.bad{color:var(--rd)}.am{color:var(--am)}
+.step{border-left:2px solid var(--line);padding:2px 0 2px 10px;margin:6px 0}
+.tag{font-size:10px;border:1px solid var(--line);border-radius:4px;padding:0 5px;margin-right:6px}
+a{color:var(--cy)}footer{margin-top:28px;color:var(--mut);font-size:11px}
+</style></head><body>
+<h1>MISOCRYPTO // REAL-DATA MONITOR</h1>
+<div class="m" id="clock"></div>
+
+<h2>LIVE FEEDS (your browser, every 30s)</h2><div class="g" id="live"></div>
+<h2>TRANSMISSION PIPELINES (observed or officially scheduled only)</h2>
+<div class="m" id="snapinfo"></div><div id="pipes"></div>
+<h2>NEWS (RSS)</h2><div id="news"></div>
+<footer>Every value comes from a public source and carries its own timestamp; a value that could not be fetched shows as unavailable, never as a guess. Steps marked "retrieved" use the time the data was fetched because the source gives no timestamp. Not financial advice. Pipelines are monitors, not forecasts.</footer>
+<script>
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const iso=t=>t?new Date(t).toISOString().replace('T',' ').slice(0,16)+' UTC':'n/a';
+const rel=t=>{if(!t)return'n/a';const s=(Date.now()-new Date(t))/1000,a=Math.abs(s);
+ const u=a<90?Math.round(a)+'s':a<5400?Math.round(a/60)+'m':a<129600?Math.round(a/3600)+'h':Math.round(a/86400)+'d';return s>=0?u+' ago':'in '+u};
+const J=async(u,i)=>{const r=await fetch(u,i);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()};
+const safeUrl=u=>/^https?:\/\//.test(u||'')?esc(u):'#';
+
+const feeds=[
+ ['CoinGecko prices',async()=>{const d=await J('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true&include_last_updated_at=true');
+  return Object.entries(d).map(([k,v])=>[k.toUpperCase(),'$'+v.usd.toLocaleString(),(v.usd_24h_change??NaN).toFixed(2)+'% 24h',new Date(v.last_updated_at*1000).toISOString()])}],
+ ['Bitcoin network (mempool.space)',async()=>{const[f,d]=await Promise.all([J('https://mempool.space/api/v1/fees/recommended'),J('https://mempool.space/api/v1/difficulty-adjustment')]);
+  return[['Fastest fee',f.fastestFee+' sat/vB','',null],['Next retarget',(+d.difficultyChange).toFixed(2)+'% est.','blocks left '+d.remainingBlocks,new Date(d.estimatedRetargetDate).toISOString()]]}],
+ ['Perp funding (Hyperliquid)',async()=>{const[m,c]=await J('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'metaAndAssetCtxs'})});
+  return m.universe.map((u,i)=>[u,c[i]]).filter(([u])=>['BTC','ETH','SOL'].includes(u.name)).map(([u,x])=>[u.name,(x.funding*100*24*365).toFixed(2)+'% ann. funding','mark $'+(+x.markPx).toLocaleString(),null])}],
+ ['Fear & Greed (alternative.me)',async()=>{const d=(await J('https://api.alternative.me/fng/?limit=1')).data[0];
+  return[['Index',d.value+' / 100',d.value_classification,new Date(d.timestamp*1000).toISOString()]]}]
+];
+async function live(){
+ const box=document.getElementById('live');
+ const out=await Promise.all(feeds.map(async([name,fn])=>{try{return{name,rows:await fn(),at:new Date().toISOString()}}catch(e){return{name,err:e.message}}}));
+ box.innerHTML=out.map(o=>`<div class="c"><div class="m">${esc(o.name)}</div>`+(o.err?`<div class="bad">unavailable: ${esc(o.err)}</div>`:
+  o.rows.map(r=>`<div class="row"><b>${esc(r[0])}</b><span>${esc(r[1])}</span></div><div class="m">${esc(r[2])} ${r[3]?'· source time '+rel(r[3]):'· fetched '+rel(o.at)}</div>`).join(''))+`</div>`).join('');
+}
+async function snap(){
+ try{const s=await J('data/snapshot.json?t='+Date.now());
+  document.getElementById('snapinfo').textContent='Server snapshot generated '+iso(s.generatedAt)+' ('+rel(s.generatedAt)+'). Sources OK: '+Object.entries(s.sources).map(([k,v])=>k+(v?' ✓':' ✗')).join('  ');
+  document.getElementById('pipes').innerHTML=s.pipelines.map(p=>`<div class="c" style="margin-bottom:8px"><div class="row"><b>${p.id}. ${esc(p.title)}</b></div>
+   <div class="m">Horizon end: ${p.horizonEnd?iso(p.horizonEnd)+' ('+rel(p.horizonEnd)+')':'none scheduled by any source'}</div>`+
+   p.steps.map(t=>`<div class="step"><span class="tag ${t.status==='OBSERVED'?'ok':t.status==='SCHEDULED'?'am':'bad'}">${t.status}</span>${esc(t.step)}
+    <div class="m">${t.at?iso(t.at)+' ('+rel(t.at)+') · time is '+esc(t.timestampKind):'no data'} · ${esc(t.source)}</div>
+    <div class="m">${esc(JSON.stringify(t.evidence)).slice(0,260)}</div></div>`).join('')+`</div>`).join('');
+  document.getElementById('news').innerHTML=s.news.ok?s.news.data.map(n=>`<div class="c" style="margin-bottom:6px"><a href="${safeUrl(n.link)}" target="_blank" rel="noopener noreferrer">${esc(n.title)}</a><div class="m">${esc(n.outlet)} · ${iso(n.publishedAt)}</div></div>`).join(''):`<div class="bad">unavailable: ${esc(s.news.error)}</div>`;
+ }catch(e){document.getElementById('snapinfo').innerHTML='<span class="bad">snapshot unavailable: '+esc(e.message)+' (it appears after the first workflow run)</span>'}
+}
+setInterval(()=>document.getElementById('clock').textContent=new Date().toISOString().replace('T',' ').slice(0,19)+' UTC',1000);
+live();snap();setInterval(live,30000);setInterval(snap,60000);
+</script></body></html>
