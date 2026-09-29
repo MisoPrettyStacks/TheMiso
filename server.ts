@@ -16,6 +16,29 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json({ limit: '2mb' }));
 
+// Graceful degradation: AI endpoints stay alive without a server key and report a
+// clear JSON error instead of crashing or silently degrading. User-supplied vault
+// keys (the multi-tier failover pipeline) still work when provided.
+const AI_NOT_CONFIGURED = {
+  error: 'AI features are not configured: GEMINI_API_KEY is missing',
+};
+
+function hasUsableVaultKeys(vaultKeys: unknown): boolean {
+  if (!vaultKeys || typeof vaultKeys !== 'object') return false;
+  return Object.values(vaultKeys as Record<string, unknown>).some(
+    (slot) =>
+      Array.isArray(slot) &&
+      slot.some((k) => typeof k === 'string' && k.trim().length >= 8)
+  );
+}
+
+function aiUnavailable(vaultKeys?: unknown): boolean {
+  return !ai && !hasUsableVaultKeys(vaultKeys);
+}
+
+// Exported for the Vercel serverless entrypoint (api/[...path].ts).
+export { app };
+
 // Server-side Gemini initialization
 const apiKey = process.env.GEMINI_API_KEY || '';
 const ai = apiKey
@@ -260,6 +283,10 @@ app.post('/api/ai/briefing', async (req, res) => {
   try {
     const { category, focusRegion, vaultKeys } = req.body;
 
+    if (aiUnavailable(vaultKeys)) {
+      return res.status(503).json(AI_NOT_CONFIGURED);
+    }
+
     const prompt = `You are the Chief Quantitative Analyst of MISOCRYPTO, an elite institutional crypto, digital, and blockchain asset intelligence desk.
 Generate a comprehensive, institutional-grade digital asset intelligence briefing.
 Category focus: ${category || 'Crypto & On-Chain Macro Transmission Cascades'}.
@@ -343,6 +370,10 @@ Format your response strictly as valid JSON with the following structure:
 app.post('/api/ai/pipeline-forecast', async (req, res) => {
   try {
     const { pipelineName, horizon, transmissionSequence, shockMultiplier = 1.0, vaultKeys } = req.body;
+
+    if (aiUnavailable(vaultKeys)) {
+      return res.status(503).json(AI_NOT_CONFIGURED);
+    }
 
     const prompt = `You are a Quantitative Crypto Econometrician and Senior Digital Asset Arbitrage Strategist.
 Given this Crypto / Blockchain Transmission Lag Pipeline:
@@ -454,6 +485,10 @@ Output strictly valid JSON with this schema:
 app.post('/api/ai/simulate-scenario', async (req, res) => {
   try {
     const { scenarioTitle, scenarioDetails, escalationLevel, vaultKeys } = req.body;
+
+    if (aiUnavailable(vaultKeys)) {
+      return res.status(503).json(AI_NOT_CONFIGURED);
+    }
 
     const prompt = `You are a Senior Quantitative Wargame Analyst for Crypto, Digital, and Blockchain Systems.
 Analyze this escalation scenario:
@@ -990,4 +1025,8 @@ async function startServer() {
   });
 }
 
-startServer();
+// In the Vercel serverless runtime the Express app is imported by api/[...path].ts,
+// so never bind a port there. Local dev (`npm run dev` / `npm start`) still listens.
+if (!process.env.VERCEL) {
+  startServer();
+}
