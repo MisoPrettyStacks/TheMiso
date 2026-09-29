@@ -6,6 +6,9 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    // `base: './'` keeps asset paths relative so the built app works when
+    // served from a sub-path (e.g. GitHub Pages project sites).
+    base: './',
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
