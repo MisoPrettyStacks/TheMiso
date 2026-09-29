@@ -83,3 +83,11 @@ base URL pointing at it, and serve `dist/` from the same server.
   "API Vault" are stored in the browser's localStorage only.
 - Nothing in this project connects to live trading or places orders. Price feeds
   are read-only public market data.
+
+
+Made with 💖 by: @MisoPrettyStacks
+
+@IGotGlitterOnMe on X
+
+
+
