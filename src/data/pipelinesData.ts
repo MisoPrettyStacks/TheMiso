@@ -643,17 +643,17 @@ export const MACRO_PIPELINES: PipelineItem[] = [
     ],
     mathModel: {
       formula: "Basis_Gap = P_Weekend_Perp - P_CME_Close = f(Net_ETF_Flow_Tminus1) * (1 - e^(-lambda_monday * t))",
-      baselineSpot: 94820.00,
+      baselineSpot: 83680.00,
       elasticityWeight: 0.48,
       shockMagnitude: 14.5,
       halfLifeWeeks: 0.5,
       correlationR2: 0.94,
       historicalPrecedent: "2024 Q1 US Spot ETF Monday Cash-Open Gap Fills (R²=0.94)",
       stepByStep: [
-        "1. Spot Base Price P_0: $94,820.00.",
+        "1. Spot Base Price P_0: $83,680.00.",
         "2. Friday ETF Inflow Volume: +$780M net creation across institutional issuers.",
         "3. Weekend Offshore Basis Dislocation: +1.85% premium on Binance perp.",
-        "4. Monday Open Cash Squeeze Target: $94,820 * (1 + 0.139) = $108,000.00 (+13.9%)."
+        "4. Monday Open Cash Squeeze Target: $83,680 * (1 + 0.139) = $95,311.52 (+13.9%)."
       ]
     }
   },

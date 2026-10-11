@@ -342,36 +342,30 @@ Format your response strictly as valid JSON with the following structure:
       }
     }
 
-    // Zero-downtime deterministic quantitative crypto model fallback
+    // Deterministic fallback: built ONLY from live data (prices, mempool).
+    // No fabricated specifics — every number below comes from a live fetch.
+    const fbPrices = await getLiveSpotPrices();
+    let fbHeight = '';
+    try {
+      const hr = await fetch('https://mempool.space/api/blocks/tip/height', {
+        headers: { 'User-Agent': 'MISOCRYPTO-Platform' }, signal: AbortSignal.timeout(8000),
+      });
+      if (hr.ok) fbHeight = (await hr.text()).trim();
+    } catch { /* best-effort */ }
+    const btc = fbPrices.BTC ? `$${fbPrices.BTC.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'unavailable';
+    const eth = fbPrices.ETH ? `$${fbPrices.ETH.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'unavailable';
     return res.json({
       success: true,
-      source: 'econometric_engine',
+      source: 'live_data_fallback',
       briefing: {
-        title: "EXECUTIVE CRYPTO & ON-CHAIN INTELLIGENCE BRIEFING // MISOCRYPTO-NET",
-        classification: "TOP SECRET // DIGITAL ASSET DESK // NOFORN",
+        title: "CRYPTO MARKET SNAPSHOT // LIVE DATA (AI UNAVAILABLE)",
+        classification: "UNCLASSIFIED // LIVE TELEMETRY ONLY",
         timestamp: new Date().toISOString(),
-        situationOverview: "Strategic on-chain telemetry across 190+ sovereign nodes and global validator meshes indicates compounding transmission lags concentrated in North American Bitcoin mining power curtailments (Texas ERCOT 4CP demand response) and Ethereum liquid restaking secondary market spreads. Invariant curve pool exhaustion on Curve ezETH/eETH pools is compressing lending protocol liquidation buffers, with a 24 to 72-hour mean-reversion squeeze horizon.",
-        criticalVulnerabilities: [
-          "North American ASIC mining fleet emergency grid load-shedding extending Bitcoin block intervals to 14.2 minutes pending epoch retarget.",
-          "Liquid Restaking Token (LRT) secondary market pool imbalance reaching 82/18 skew, elevating cascade liquidation risk across Aave and Morpho.",
-          "Subsea inter-validator fiber latency variance elevating MEV sandwich extraction by +38% across cross-rollup arbitrage searchers."
-        ],
-        tacticalArbitrageOpportunities: [
-          {
-            pipeline: "Bitcoin Hashrate Regional Grid Curtailment -> Miner Treasury Depletion Lag",
-            direction: "LONG Spot BTC & Vertically Integrated Miners (CLSK) / SHORT High-OPEX Merchant Miners (MARA)",
-            timeHorizon: "1-3 Weeks",
-            mathForecast: "P_target = $112,500.00 (+18.6%) via difficulty elasticity w=0.42"
-          },
-          {
-            pipeline: "EigenLayer AVS Slashing Anomaly -> LRT Depeg -> DeFi Liquidation",
-            direction: "LONG Fixed Yield Derivatives (PENDLE) / SHORT Synthetic Delta-Neutral Dollars (ENA)",
-            timeHorizon: "24-72 Hours",
-            mathForecast: "P_target = $4,250.00 (+22.1%) via invariant exhaustion discount w=0.68"
-          }
-        ],
-        defconStatus: "DEFCON 2 // ELEVATED ON-CHAIN ASYMMETRY",
-        analystNote: "Empirical Poisson block arrival regression confirms current difficulty lag tracks the April 2024 post-halving miner capitulation vector with an R-squared of 0.92."
+        situationOverview: `AI generation is currently unavailable, so this briefing is assembled strictly from live data feeds as of ${new Date().toISOString()}. Bitcoin spot: ${btc}. Ethereum spot: ${eth}.${fbHeight ? ` Bitcoin tip block height: #${fbHeight} (mempool.space).` : ''} No forward projections are included — every figure above was fetched live.`,
+        criticalVulnerabilities: [],
+        tacticalArbitrageOpportunities: [],
+        defconStatus: "DEFCON 5 // AI OFFLINE — LIVE DATA ONLY",
+        analystNote: "Regenerate when AI service is restored for full econometric analysis. This snapshot contains only verified live figures."
       }
     });
   } catch (error: any) {
@@ -384,6 +378,49 @@ Format your response strictly as valid JSON with the following structure:
 });
 
 // API: AI Deep Pipeline Mathematical Price Forecast & Trade Dossier
+/**
+ * Live crypto spot prices for grounding AI prompts. Binance public API first,
+ * DefiLlama oracle as fallback. Never throws — returns best-effort prices.
+ */
+async function getLiveSpotPrices(): Promise<Record<string, number>> {
+  const out: Record<string, number> = {};
+  const symbols: Record<string, string> = {
+    BTC: 'BTCUSDT', ETH: 'ETHUSDT', SOL: 'SOLUSDT', XRP: 'XRPUSDT',
+    ADA: 'ADAUSDT', DOGE: 'DOGEUSDT',
+  };
+  try {
+    const res = await fetch('https://api.binance.com/api/v3/ticker/price', {
+      headers: { 'User-Agent': 'MISOCRYPTO-Platform' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) {
+      const arr = (await res.json()) as Array<{ symbol: string; price: string }>;
+      const map = new Map(arr.map((t) => [t.symbol, parseFloat(t.price)]));
+      for (const [k, sym] of Object.entries(symbols)) {
+        const p = map.get(sym);
+        if (p && p > 0) out[k] = p;
+      }
+    }
+  } catch { /* fall through to DefiLlama */ }
+  if (!out.BTC || !out.ETH) {
+    try {
+      const res = await fetch(
+        'https://coins.llama.fi/prices/current/coingecko:bitcoin,coingecko:ethereum,coingecko:solana,coingecko:ripple',
+        { headers: { 'User-Agent': 'MISOCRYPTO-Platform' }, signal: AbortSignal.timeout(8000) }
+      );
+      if (res.ok) {
+        const data = (await res.json()) as { coins: Record<string, { price: number }> };
+        const c = data.coins || {};
+        if (!out.BTC && c['coingecko:bitcoin']?.price) out.BTC = c['coingecko:bitcoin'].price;
+        if (!out.ETH && c['coingecko:ethereum']?.price) out.ETH = c['coingecko:ethereum'].price;
+        if (!out.SOL && c['coingecko:solana']?.price) out.SOL = c['coingecko:solana'].price;
+        if (!out.XRP && c['coingecko:ripple']?.price) out.XRP = c['coingecko:ripple'].price;
+      }
+    } catch { /* best-effort */ }
+  }
+  return out;
+}
+
 app.post('/api/ai/pipeline-forecast', async (req, res) => {
   try {
     const { pipelineName, horizon, transmissionSequence, shockMultiplier = 1.0, vaultKeys } = req.body;
@@ -392,12 +429,25 @@ app.post('/api/ai/pipeline-forecast', async (req, res) => {
       return res.status(503).json(AI_NOT_CONFIGURED);
     }
 
+    // Live spot prices — the AI must use THESE, never its training-data prices.
+    const livePrices = await getLiveSpotPrices();
+    const priceLines = Object.entries(livePrices)
+      .map(([k, v]) => `${k}: $${v.toLocaleString('en-US', { maximumFractionDigits: 2 })}`)
+      .join(', ');
+    const priceBlock = priceLines
+      ? `\nLIVE SPOT PRICES (fetched seconds ago — USE THESE EXACT VALUES as P_0 baselines. NEVER use prices from your training data; they are stale):\n${priceLines}\n`
+      : '';
+
     const prompt = `You are a Quantitative Crypto Econometrician and Senior Digital Asset Arbitrage Strategist.
 Given this Crypto / Blockchain Transmission Lag Pipeline:
 Pipeline Name: "${pipelineName}"
 Squeeze Horizon: "${horizon}"
 Transmission Sequence: "${transmissionSequence}"
 User Squeeze Shock Multiplier: ${shockMultiplier}x
+${priceBlock}
+CRITICAL: Every baseline spot price P_0 in your math derivation MUST be the live price above for that asset. If a live price is missing for an asset, say so explicitly instead of inventing one.
+
+Provide an exhaustive institutional crypto trade dossier with:
 
 Provide an exhaustive institutional crypto trade dossier with:
 1. Very clear crypto tokens/digital assets of what will be affected (Long and Short with tickers and expected move).
@@ -447,44 +497,40 @@ Output strictly valid JSON with this schema:
       }
     }
 
-    // Deterministic mathematical model for crypto offline/fallback (zero connection loss)
-    const baseP = 94820.00;
+    // Deterministic fallback: live BTC price as P_0, no fabricated baselines.
+    const fbLive = await getLiveSpotPrices();
+    const baseP = fbLive.BTC || 0;
+    if (!baseP) {
+      return res.status(503).json({ success: false, error: 'AI unavailable and live price feed unreachable — no forecast generated rather than a fabricated one.' });
+    }
     const targetP = (baseP * (1 + 0.1865 * shockMultiplier)).toFixed(2);
+    const baseFmt = `$${baseP.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     return res.json({
       success: true,
-      source: 'econometric_engine',
+      source: 'live_data_fallback',
       forecast: {
         pipeline: pipelineName,
         calculatedTargetPrice: targetP,
         expectedReturnPct: +(18.65 * shockMultiplier).toFixed(1),
-        recommendedEntryRange: "$91,500.00 - $93,800.00",
+        recommendedEntryRange: "see AI dossier when service restores",
         recommendedExitTarget: `$${targetP}`,
-        recommendedStopLoss: "$88,200.00",
-        riskRewardRatio: "1 : 4.2",
+        recommendedStopLoss: "see AI dossier when service restores",
+        riskRewardRatio: "see AI dossier when service restores",
         mathematicalFormula: "P_crypto(t) = P_0 * [1 + w_miner * (Delta_Hashrate / H_0) * exp(-lambda_epoch * t) + beta_liq * Delta_CEX_Flow]",
         mathDerivation: [
-          `Base Spot Price P_0 = $94,820.00 BTC`,
-          `On-Chain Difficulty Transmission Elasticity w_miner = 0.42 (p < 0.001 based on 7-year Glassnode mining regressions)`,
+          `Base Spot Price P_0 = ${baseFmt} BTC (live, Binance)`,
+          `On-Chain Difficulty Transmission Elasticity w_miner = 0.42`,
           `Hashrate Squeeze Shock Amplitude Delta_I_1 = ${(18.5 * shockMultiplier).toFixed(1)}%`,
           `Difficulty Epoch Decay Constant lambda = 0.347 / week (Half-life = 2.0 weeks)`,
           `Net On-Chain Cascading Drift = +${(18.65 * shockMultiplier).toFixed(1)}%`,
-          `Forecast Price = $94,820 * (1 + ${(0.1865 * shockMultiplier).toFixed(3)}) = $${targetP}`
+          `Forecast Price = ${baseFmt} * (1 + ${(0.1865 * shockMultiplier).toFixed(3)}) = $${targetP}`
         ],
-        historicalPrecedents: [
-          { event: "2024 April Post-Halving Hashrate Capitulation", correlation: 0.92, impactObserved: "+28.4%" },
-          { event: "2021 May Xinjiang Coal Mining Grid Ban", correlation: 0.95, impactObserved: "+34.2%" },
-          { event: "2022 Dec Core Scientific Chapter 11 Hashrate Purge", correlation: 0.88, impactObserved: "+21.8%" }
-        ],
+        historicalPrecedents: [],
         affectedTickers: {
           long: [
             { ticker: "BTC", name: "Bitcoin", beta: 1.00, expectedMove: `+${(18.6 * shockMultiplier).toFixed(1)}%` },
-            { ticker: "CLSK", name: "CleanSpark Inc", beta: 2.15, expectedMove: `+${(32.4 * shockMultiplier).toFixed(1)}%` },
-            { ticker: "MSTR", name: "MicroStrategy", beta: 2.30, expectedMove: `+${(38.2 * shockMultiplier).toFixed(1)}%` }
           ],
-          short: [
-            { ticker: "MARA", name: "MARA Holdings", beta: 2.45, expectedMove: `-${(22.1 * shockMultiplier).toFixed(1)}%` },
-            { ticker: "ENA", name: "Ethena Synthetic Dollar", beta: 2.10, expectedMove: `-${(18.4 * shockMultiplier).toFixed(1)}%` }
-          ]
+          short: []
         },
         strategicExecutionWindow: `Active deployment: Day 3 to Day 18 of Squeeze Horizon (${horizon}).`
       }
@@ -544,32 +590,19 @@ Output strictly valid JSON with this structure:
       }
     }
 
-    // Zero-downtime deterministic simulation fallback
+    // Fallback when AI is unavailable: honest structure, no fabricated numbers.
+    // A war-game is inherently hypothetical, but we will not invent specifics.
     return res.json({
       success: true,
-      source: 'econometric_engine',
+      source: 'template_fallback',
       simulation: {
         scenario: scenarioTitle,
-        escalationStage: `Stage ${escalationLevel || 3}: Critical Protocol Disruption`,
-        timelineProgression: [
-          { phase: "T+0 to T+6 Hours", event: "Initial on-chain / electrical trigger. 3.2 GW of ASIC mining fleets shed load across ERCOT; block intervals stretch from 10 to 14.5 minutes." },
-          { phase: "T+6 to T+24 Hours", event: "Secondary mempool congestion. Unconfirmed transaction count reaches 280,000; priority transaction fees surge 12x on Bitcoin and Ethereum L1." },
-          { phase: "T+1 to T+2 Weeks", event: "Miner treasury depletion and liquidity drain. Marginal miners transfer 12,500 BTC to CEX deposit addresses to cover operational fixed costs." },
-          { phase: "T+2 to T+4 Weeks", event: "Difficulty retarget resets -4.8%. Mining margins expand for surviving fleets, triggering a violent short squeeze across perpetual markets." }
-        ],
-        highestVulnerabilitySectors: ["High-OPEX Proof-of-Work Miners", "Liquid Restaking Protocols (LRTs)", "Modular Rollup Sequencers", "Perpetual DEX AMMs"],
-        projectedAssetSwings: [
-          { asset: "Bitcoin (BTC)", projectedChange: "+18.6%", confidence: "High" },
-          { asset: "CleanSpark (CLSK)", projectedChange: "+34.2%", confidence: "High" },
-          { asset: "Solana (SOL)", projectedChange: "+24.5%", confidence: "Moderate" },
-          { asset: "High-OPEX Miners (MARA)", projectedChange: "-19.2%", confidence: "High" }
-        ],
-        transmissionPipelinesActivated: [
-          "Bitcoin Hashrate Regional Grid Curtailment -> Miner Treasury Depletion Lag",
-          "EigenLayer AVS Slashing Anomaly -> LRT Depeg -> DeFi Liquidation",
-          "Solana MEV Priority Fee Auction Wars -> DEX Congestion"
-        ],
-        analystTakeaways: "Position long spot BTC and vertically integrated miners while establishing short hedges on leveraged altcoin perpetuals paying positive funding."
+        escalationStage: `Stage ${escalationLevel || 3}`,
+        timelineProgression: [],
+        highestVulnerabilitySectors: [],
+        projectedAssetSwings: [],
+        transmissionPipelinesActivated: [],
+        analystTakeaways: "AI service is currently unavailable — no simulated projections generated. Regenerate when the AI service is restored. No figures above are fabricated; empty sections require AI generation."
       }
     });
   } catch (error: any) {
@@ -582,6 +615,62 @@ Output strictly valid JSON with this structure:
 });
 
 // API: Live Real-Time Benchmark Crypto Prices & Multi-Chain Asymmetry Ticker
+/**
+ * Live macro totals. CoinGecko global (market cap, BTC dominance),
+ * mempool.space (Bitcoin hashrate), DefiLlama (DeFi TVL), Binance (USDT peg
+ * via USDT/USD proxy). All best-effort — fields are null when unreachable,
+ * never hardcoded.
+ */
+async function getLiveMacro(prices: Record<string, { price: number }>): Promise<{
+  totalMarketCap: string | null;
+  btcDominance: string | null;
+  tetherPeg: string | null;
+  hashrate: string | null;
+  defiTvl: string | null;
+}> {
+  const out = { totalMarketCap: null as string | null, btcDominance: null as string | null, tetherPeg: null as string | null, hashrate: null as string | null, defiTvl: null as string | null };
+  const UA = { 'User-Agent': 'MISOCRYPTO-Platform' };
+  // CoinGecko global: total market cap + BTC dominance
+  try {
+    const r = await fetch('https://api.coingecko.com/api/v3/global', { headers: UA, signal: AbortSignal.timeout(8000) });
+    if (r.ok) {
+      const j = (await r.json()) as { data: { total_market_cap: { usd: number }; market_cap_percentage: { btc: number } } };
+      const mcap = j.data?.total_market_cap?.usd;
+      const dom = j.data?.market_cap_percentage?.btc;
+      if (mcap > 0) out.totalMarketCap = mcap >= 1e12 ? `$${(mcap / 1e12).toFixed(2)}T` : `$${(mcap / 1e9).toFixed(0)}B`;
+      if (dom > 0) out.btcDominance = `${dom.toFixed(1)}%`;
+    }
+  } catch { /* best-effort */ }
+  // mempool.space: Bitcoin network hashrate (3d avg, EH/s)
+  try {
+    const r = await fetch('https://mempool.space/api/v1/mining/hashrate/3d', { headers: UA, signal: AbortSignal.timeout(8000) });
+    if (r.ok) {
+      const j = (await r.json()) as { currentHashrate?: number };
+      const hs = j.currentHashrate;
+      if (hs && hs > 0) out.hashrate = `${(hs / 1e18).toFixed(0)} EH/s`;
+    }
+  } catch { /* best-effort */ }
+  // DefiLlama: total DeFi TVL
+  try {
+    const r = await fetch('https://api.llama.fi/v2/historicalChainTvl', { headers: UA, signal: AbortSignal.timeout(8000) });
+    if (r.ok) {
+      const arr = (await r.json()) as Array<{ tvl: number }>;
+      const last = arr[arr.length - 1];
+      if (last && last.tvl > 0) out.defiTvl = `$${(last.tvl / 1e9).toFixed(1)}B`;
+    }
+  } catch { /* best-effort */ }
+  // USDT peg: derive from BTC price in USDT vs USD proxy — use DefiLlama stablecoin price
+  try {
+    const r = await fetch('https://coins.llama.fi/prices/current/coingecko:tether', { headers: UA, signal: AbortSignal.timeout(8000) });
+    if (r.ok) {
+      const j = (await r.json()) as { coins: Record<string, { price: number }> };
+      const p = j.coins?.['coingecko:tether']?.price;
+      if (p > 0) out.tetherPeg = p.toFixed(4);
+    }
+  } catch { /* best-effort */ }
+  return out;
+}
+
 app.get('/api/live/prices', async (_req, res) => {
   try {
     let prices: Record<string, { 
@@ -775,9 +864,8 @@ app.get('/api/live/prices', async (_req, res) => {
       console.warn('DefiLlama price fetch fallback to ground-truth:', e);
     }
 
-    // Global Macro Totals
-    const totalMarketCap = "$2.84T";
-    const btcDominance = "57.8%";
+    // Global Macro Totals — all live, no hardcoded values.
+    const macro = await getLiveMacro(prices);
     const ethBtcRatio = (prices.ETH.price / prices.BTC.price).toFixed(4);
 
     return res.json({
@@ -785,12 +873,8 @@ app.get('/api/live/prices', async (_req, res) => {
       timestamp: new Date().toISOString(),
       prices,
       macro: {
-        totalMarketCap,
-        btcDominance,
+        ...macro,
         ethBtcRatio,
-        tetherPeg: "0.9998",
-        hashrate: "685 EH/s",
-        defiTvl: "$114.8B"
       }
     });
   } catch (error: any) {

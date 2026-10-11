@@ -21,7 +21,8 @@ import {
   CheckCircle2,
   Info
 } from 'lucide-react';
-import { INITIAL_OSINT_EVENTS, STRATEGIC_CHOKEPOINTS, OsintEvent } from '../data/osintEvents';
+import { STRATEGIC_CHOKEPOINTS, OsintEvent } from '../data/osintEvents';
+import { api } from '../services/apiBase';
 import { soundEffects } from '../services/soundEffects';
 
 interface GlobalMapProps {
@@ -128,6 +129,41 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
   const [activeTileKey, setActiveTileKey] = useState<'tactical' | 'satellite' | 'street' | 'osm'>('tactical');
   const [selectedTheater, setSelectedTheater] = useState<string>('GLOBAL');
   const [selectedLayer, setSelectedLayer] = useState<'ALL' | 'MINING' | 'DEFI' | 'SOVEREIGN' | 'MEV' | 'AI'>('ALL');
+  // Live OSINT events — fetched from the backend, never static demo data.
+  const [liveEvents, setLiveEvents] = useState<OsintEvent[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(api('/api/live/osint-feed'));
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        const rows: OsintEvent[] = (data.liveDispatches || []).map((d: any) => ({
+          id: d.id,
+          title: d.title,
+          category: d.category || 'Infrastructure & MEV',
+          sourceType: d.sourceType || 'PRIMARY',
+          country: d.country || 'Global',
+          region: d.region || 'Global',
+          lat: d.lat ?? 31.96,
+          lon: d.lon ?? -99.90,
+          timestamp: d.timestamp || new Date().toISOString(),
+          tier: d.tier || 'ELEVATED',
+          source: d.source || 'Live Feed',
+          sourceUrl: d.sourceUrl,
+          rawTelemetry: d.rawTelemetry,
+          summary: d.summary,
+          affectedTickers: d.affectedTickers || ['BTC', 'ETH'],
+          pipelineId: d.pipelineId || 1,
+          pipelineRef: d.pipelineRef,
+          verified: true,
+        }));
+        setLiveEvents(rows);
+      } catch { /* map renders chokepoints regardless */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const [showShippingLanes, setShowShippingLanes] = useState<boolean>(true);
   const [cursorCoords, setCursorCoords] = useState<{ lat: number; lng: number } | null>({ lat: 31.96, lng: -99.90 });
   const [activeItem, setActiveItem] = useState<{
@@ -143,9 +179,9 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
     return MAP_PROVIDERS[providerKey].url;
   };
 
-  // Filter events based on active category layer
+  // Filter live events based on active category layer
   const filteredEvents = useMemo(() => {
-    return INITIAL_OSINT_EVENTS.filter((evt) => {
+    return liveEvents.filter((evt) => {
       if (selectedLayer === 'MINING' && evt.category !== 'Mining & Energy') return false;
       if (selectedLayer === 'DEFI' && evt.category !== 'DeFi & Protocol' && evt.category !== 'Stablecoin & Liquidity') return false;
       if (selectedLayer === 'SOVEREIGN' && evt.category !== 'Sovereign & Regulatory') return false;
@@ -153,7 +189,7 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
       if (selectedLayer === 'AI' && evt.category !== 'Crypto AI & Compute') return false;
       return true;
     });
-  }, [selectedLayer]);
+  }, [selectedLayer, liveEvents]);
 
   // 1. Initialize Leaflet Map
   useEffect(() => {

@@ -17,7 +17,7 @@ import {
   Layers,
   FileText
 } from 'lucide-react';
-import { INITIAL_OSINT_EVENTS, OsintEvent } from '../data/osintEvents';
+import { OsintEvent } from '../data/osintEvents';
 import { soundEffects } from '../services/soundEffects';
 import { api } from '../services/apiBase';
 
@@ -26,7 +26,7 @@ interface LiveIntelligenceFeedProps {
 }
 
 export const LiveIntelligenceFeed: React.FC<LiveIntelligenceFeedProps> = ({ onSelectPipeline }) => {
-  const [events, setEvents] = useState<OsintEvent[]>(INITIAL_OSINT_EVENTS);
+  const [events, setEvents] = useState<OsintEvent[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedTicker, setSelectedTicker] = useState<string>('ALL');
