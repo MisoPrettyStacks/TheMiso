@@ -19,22 +19,20 @@ import {
   AlertTriangle,
   Flame,
   CheckCircle2,
-  Info,
-  Key
+  Info
 } from 'lucide-react';
 import { INITIAL_OSINT_EVENTS, STRATEGIC_CHOKEPOINTS, OsintEvent } from '../data/osintEvents';
 import { soundEffects } from '../services/soundEffects';
-import { apiVaultService } from '../services/apiVaultService';
 
 interface GlobalMapProps {
   onSelectPipeline: (pipelineId: number) => void;
   onOpenApiVault?: () => void;
 }
 
-// Map Tile Layer Configurations (Out-of-the-box free, optional CARTO key support)
+// Map Tile Layer Configurations — all free, no API key needed.
 const MAP_PROVIDERS = {
   tactical: {
-    name: 'TACTICAL DARK (CARTO)',
+    name: 'TACTICAL DARK',
     url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
     subdomains: 'abcd',
     attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
@@ -113,7 +111,7 @@ const CRYPTO_DATA_CONDUITS: { name: string; color: string; coords: [number, numb
   }
 ];
 
-export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline, onOpenApiVault }) => {
+export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
@@ -121,7 +119,6 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline, onOpenAp
   const routesLayerGroup = useRef<L.LayerGroup | null>(null);
 
   const [activeTileKey, setActiveTileKey] = useState<'tactical' | 'satellite' | 'osm'>('tactical');
-  const [cartoKey, setCartoKey] = useState<string | null>(() => apiVaultService.getCartoKey());
   const [selectedTheater, setSelectedTheater] = useState<string>('GLOBAL');
   const [selectedLayer, setSelectedLayer] = useState<'ALL' | 'MINING' | 'DEFI' | 'SOVEREIGN' | 'MEV' | 'AI'>('ALL');
   const [showShippingLanes, setShowShippingLanes] = useState<boolean>(true);
@@ -134,25 +131,8 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline, onOpenAp
     data: STRATEGIC_CHOKEPOINTS[0] // Texas ERCOT by default
   });
 
-  // Keep cartoKey synced if updated in vault
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const currentCarto = apiVaultService.getCartoKey();
-      if (currentCarto !== cartoKey) {
-        setCartoKey(currentCarto);
-      }
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [cartoKey]);
-
-  // Construct tile URL (appends api_key for CARTO if provided in vault)
+  // Tile URL — all three providers are free and keyless.
   const getTileUrl = (providerKey: 'tactical' | 'satellite' | 'osm') => {
-    if (providerKey === 'tactical') {
-      if (cartoKey) {
-        return `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${encodeURIComponent(cartoKey)}`;
-      }
-      return 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-    }
     return MAP_PROVIDERS[providerKey].url;
   };
 
@@ -233,7 +213,7 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline, onOpenAp
       attribution: provider.attribution,
       maxZoom: provider.maxZoom
     }).addTo(map);
-  }, [activeTileKey, cartoKey]);
+  }, [activeTileKey]);
 
   // 3. Render Shipping Lanes & Maritime Routes
   useEffect(() => {
@@ -463,28 +443,6 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline, onOpenAp
                 </button>
               ))}
 
-              {/* Carto.com Key Badge & Direct Key Vault Launcher */}
-              {onOpenApiVault && (
-                <button
-                  onClick={() => {
-                    soundEffects.playTick();
-                    onOpenApiVault();
-                  }}
-                  className={`ml-1 flex items-center space-x-1 px-2 py-1 rounded text-[10px] font-semibold border transition-all hover:scale-105 ${
-                    cartoKey
-                      ? 'bg-cyan-950/80 border-cyan-500/60 text-cyan-300 hover:bg-cyan-900'
-                      : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-cyan-500/50 hover:text-cyan-200'
-                  }`}
-                  title={
-                    cartoKey
-                      ? `Custom CARTO Key Active (${cartoKey.slice(0, 5)}...). Click to manage in Key Vault.`
-                      : 'CARTO Dark Matter Free Public Basemap is active out-of-the-box (no key required). Click to enter a custom carto.com API key.'
-                  }
-                >
-                  <Key className="w-3 h-3 text-cyan-400" />
-                  <span>{cartoKey ? 'CARTO: CUSTOM KEY' : 'CARTO: FREE PUBLIC'}</span>
-                </button>
-              )}
             </div>
 
             {/* Layer Filter Toggles */}
