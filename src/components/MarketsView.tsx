@@ -14,6 +14,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { lseService, LseAssetQuote, LseRateQuote } from '../services/lseService';
+import { directService, DirectCotRow, DirectYieldCurve } from '../services/directService';
 import { soundEffects } from '../services/soundEffects';
 
 interface MarketsViewProps {
@@ -146,38 +147,19 @@ function RawTable({ rows, prefer = [] as string[], maxRows = 10 }: { rows: any[]
   );
 }
 
-/** Net positioning bar for a COT row. */
-function CotCard({ symbol, row }: { symbol: string; row: any }) {
-  const keys = Object.keys(row);
-  const numOf = (k: string) => {
-    const v = row[k];
-    const n = typeof v === 'number' ? v : parseFloat(`${v}`);
-    return isNaN(n) ? null : n;
-  };
-  const longs = keys.filter((k) => /long/i.test(k));
-  const shorts = keys.filter((k) => /short/i.test(k));
-  const lKey = longs.find((k) => /non.?commercial|managed/i.test(k)) || longs[0];
-  const sKey = shorts.find((k) => /non.?commercial|managed/i.test(k)) || shorts[0];
-  const l = lKey ? numOf(lKey) : null;
-  const s = sKey ? numOf(sKey) : null;
-  const date = pick(row, ['date', 'report_date', 'as_of', 'timestamp']);
-
-  if (l === null || s === null || l + s === 0) {
-    return (
-      <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
-        <div className="text-xs font-mono font-bold text-slate-200">{symbol}</div>
-        <EmptyRow label="No long/short split in row" />
-      </div>
-    );
-  }
-  const netPct = ((l - s) / (l + s)) * 100;
-  const longPct = (l / (l + s)) * 100;
+/** Net positioning bar for a direct CFTC COT row. */
+function DirectCotCard({ row }: { row: DirectCotRow }) {
+  const total = row.long + row.short;
+  const netPct = total ? ((row.long - row.short) / total) * 100 : 0;
+  const longPct = total ? (row.long / total) * 100 : 50;
   const bias = netPct > 15 ? 'LONG HEAVY' : netPct < -15 ? 'SHORT HEAVY' : 'BALANCED';
   const biasColor = netPct > 15 ? 'text-emerald-400' : netPct < -15 ? 'text-rose-400' : 'text-slate-400';
   return (
     <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-mono font-bold text-slate-200">{symbol}</span>
+        <span className="text-xs font-mono font-bold text-slate-200">
+          {row.symbol} <span className="text-slate-500 font-normal">· {row.label}</span>
+        </span>
         <span className={`text-[10px] font-mono font-bold ${biasColor}`}>{bias}</span>
       </div>
       <div className="h-2 rounded-full bg-slate-800 overflow-hidden flex">
@@ -185,11 +167,14 @@ function CotCard({ symbol, row }: { symbol: string; row: any }) {
         <div className="bg-rose-500/80 h-full" style={{ width: `${100 - longPct}%` }} />
       </div>
       <div className="flex justify-between text-[10px] font-mono text-slate-500">
-        <span>L {Math.round(l).toLocaleString()}</span>
+        <span>L {Math.round(row.long).toLocaleString()}</span>
         <span>NET {netPct >= 0 ? '+' : ''}{netPct.toFixed(1)}%</span>
-        <span>S {Math.round(s).toLocaleString()}</span>
+        <span>S {Math.round(row.short).toLocaleString()}</span>
       </div>
-      {date && <div className="text-[10px] font-mono text-slate-600">as of {`${date}`.slice(0, 10)}</div>}
+      <div className="flex justify-between text-[10px] font-mono text-slate-600">
+        <span>{row.longLabel}</span>
+        <span>{row.date}</span>
+      </div>
     </div>
   );
 }
@@ -202,9 +187,10 @@ export const MarketsView: React.FC<MarketsViewProps> = ({ onOpenVault }) => {
   const [rates, setRates] = useState<LseRateQuote[]>([]);
   const [packTime, setPackTime] = useState('');
   const [calendar, setCalendar] = useState<any[]>([]);
-  const [cot, setCot] = useState<any[]>([]);
+  const [cot, setCot] = useState<DirectCotRow[]>([]);
   const [flow, setFlow] = useState<any[]>([]);
   const [insiders, setInsiders] = useState<any[]>([]);
+  const [yields, setYields] = useState<DirectYieldCurve | null>(null);
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -254,16 +240,30 @@ export const MarketsView: React.FC<MarketsViewProps> = ({ onOpenVault }) => {
     }
   };
 
+  // DIRECT: CFTC Commitments of Traders — no key, no middleman.
   const loadCot = async () => {
     setL('cot', true);
     setE('cot', undefined);
     try {
-      const c = await lseService.getCot();
+      const c = await directService.getCot();
       setCot(c.rows || []);
     } catch (e: any) {
-      setE('cot', e.code === 'LSE_KEY_MISSING' ? 'KEY_MISSING' : e.message);
+      setE('cot', e.message);
     } finally {
       setL('cot', false);
+    }
+  };
+
+  // DIRECT: U.S. Treasury par yield curve — no key, no middleman.
+  const loadYields = async () => {
+    setL('yld', true);
+    setE('yld', undefined);
+    try {
+      setYields(await directService.getYields());
+    } catch (e: any) {
+      setE('yld', e.message);
+    } finally {
+      setL('yld', false);
     }
   };
 
@@ -280,14 +280,15 @@ export const MarketsView: React.FC<MarketsViewProps> = ({ onOpenVault }) => {
     }
   };
 
+  // DIRECT: SEC EDGAR Form 4 filings — no key, no middleman.
   const loadInsiders = async () => {
     setL('ins', true);
     setE('ins', undefined);
     try {
-      const r = await lseService.getInsiderBuys(12);
+      const r = await directService.getInsiderBuys(12);
       setInsiders(r.rows || []);
     } catch (e: any) {
-      setE('ins', e.code === 'LSE_KEY_MISSING' ? 'KEY_MISSING' : e.message);
+      setE('ins', e.message);
     } finally {
       setL('ins', false);
     }
@@ -298,6 +299,7 @@ export const MarketsView: React.FC<MarketsViewProps> = ({ onOpenVault }) => {
     loadPack();
     loadCalendar();
     loadCot();
+    loadYields();
     loadFlow();
     loadInsiders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -317,7 +319,8 @@ export const MarketsView: React.FC<MarketsViewProps> = ({ onOpenVault }) => {
           <h1 className="text-2xl sm:text-3xl font-bold font-mono text-slate-100">Cross-Asset Regime Desk</h1>
           <p className="text-xs sm:text-sm font-mono text-slate-400 mt-1">
             Deep history, positioning, policy calendar, and smart-money flow — the market half of the
-            situational picture, fed by the London Strategic Edge vault.
+            situational picture. Positioning, yields, and insider tape come <span className="text-emerald-400 font-bold">DIRECT</span> from
+            the CFTC, Treasury, and SEC — no middleman, no key. Benchmarks, calendar, and options flow ride the LSE vault.
           </p>
         </div>
         <div
@@ -338,9 +341,9 @@ export const MarketsView: React.FC<MarketsViewProps> = ({ onOpenVault }) => {
             <div>
               <div className="text-sm font-mono font-bold text-amber-200">Connect the market-data vault</div>
               <p className="text-xs font-mono text-slate-400 mt-1 max-w-2xl">
-                This desk reads the London Strategic Edge vault — free key, no tiers. Paste it into the
-                Key Vault under the <span className="text-amber-300">LSE</span> provider (or set LSE_API_KEY on
-                the server) and every section below lights up: benchmarks, COT, calendar, options flow, insider tape.
+                Positioning (CFTC), yields (Treasury), and insider filings (SEC) already load direct — no key needed.
+                For the benchmark tape, policy calendar, and options flow, paste a free London Strategic Edge key into the
+                Key Vault under the <span className="text-amber-300">LSE</span> provider (or set LSE_API_KEY on the server).
               </p>
             </div>
           </div>
@@ -390,17 +393,51 @@ export const MarketsView: React.FC<MarketsViewProps> = ({ onOpenVault }) => {
             {assets.length === 0 && <EmptyRow label="No benchmarks resolved" />}
           </div>
         )}
-        {/* Rates strip */}
-        {rates.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-slate-800 flex flex-wrap gap-x-6 gap-y-2">
-            {rates.map((r) => (
-              <div key={r.id} className="text-xs font-mono">
-                <span className="text-slate-500">{r.label}: </span>
-                <span className="text-cyan-300 font-bold">{fmtNum(r.value)}</span>
-              </div>
-            ))}
+        {/* Rates strip — DIRECT from the U.S. Treasury */}
+        <div className="mt-4 pt-4 border-t border-slate-800">
+          <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-2">
+            U.S. Treasury par yields{yields ? ` · ${yields.date}` : ''}{' '}
+            <span className="text-emerald-400 font-bold">DIRECT</span>
           </div>
-        )}
+          {loading.yld && !yields ? (
+            <LoadingRow label="Reading Treasury curve…" />
+          ) : yields ? (
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              {(
+                [
+                  ['2Y', yields.year2],
+                  ['5Y', yields.year5],
+                  ['10Y', yields.year10],
+                  ['30Y', yields.year30],
+                ] as [string, number | null][]
+              ).map(([label, v]) => (
+                <div key={label as string} className="text-xs font-mono">
+                  <span className="text-slate-500">{label}: </span>
+                  <span className="text-cyan-300 font-bold">{v !== null ? `${v.toFixed(2)}%` : '—'}</span>
+                </div>
+              ))}
+              {yields.year2 !== null && yields.year10 !== null && (
+                <div className="text-xs font-mono">
+                  <span className="text-slate-500">2s10s: </span>
+                  <span className={`font-bold ${(yields.year10 - yields.year2) < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    {((yields.year10 - yields.year2) * 100).toFixed(0)}bp
+                  </span>
+                </div>
+              )}
+              {rates
+                .filter((r) => r.id === 'cpi' || r.id === 'fedfunds')
+                .map((r) => (
+                  <div key={r.id} className="text-xs font-mono">
+                    <span className="text-slate-500">{r.label}: </span>
+                    <span className="text-cyan-300 font-bold">{fmtNum(r.value)}</span>
+                    <span className="text-slate-600"> · LSE</span>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <div className="text-xs font-mono text-amber-400">{errors.yld || 'Yield curve unavailable'}</div>
+          )}
+        </div>
       </Section>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -408,26 +445,29 @@ export const MarketsView: React.FC<MarketsViewProps> = ({ onOpenVault }) => {
         <Section
           icon={<Users className="w-4 h-4" />}
           title="COT POSITIONING"
-          subtitle="Commitments of Traders — speculative net bias per future"
+          subtitle="Commitments of Traders — direct from the CFTC, no key"
           accent="text-cyan-400"
           onRefresh={loadCot}
           loading={loading.cot}
         >
           {loading.cot && cot.length === 0 ? (
-            <LoadingRow label="Reading positioning…" />
+            <LoadingRow label="Reading CFTC positioning…" />
           ) : errors.cot ? (
             <div className="flex items-center space-x-2 text-amber-400 text-xs font-mono py-4 justify-center">
               <AlertTriangle className="w-4 h-4" />
-              <span>{errors.cot === 'KEY_MISSING' ? 'Vault key required.' : errors.cot}</span>
+              <span>{errors.cot}</span>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {cot.map((c, i) => (
-                <CotCard key={c.symbol || i} symbol={c.symbol} row={c.latest || {}} />
+              {cot.map((c) => (
+                <DirectCotCard key={c.symbol} row={c} />
               ))}
               {cot.length === 0 && <EmptyRow label="No COT rows" />}
             </div>
           )}
+          <div className="mt-3 text-[10px] font-mono text-slate-600">
+            Source: CFTC Commitments of Traders (cftc.gov) · <span className="text-emerald-400 font-bold">DIRECT</span> · updated weekly
+          </div>
         </Section>
 
         {/* 3 — Economic calendar */}
@@ -500,21 +540,50 @@ export const MarketsView: React.FC<MarketsViewProps> = ({ onOpenVault }) => {
         <Section
           icon={<Landmark className="w-4 h-4" />}
           title="INSIDER TAPE"
-          subtitle="Recent open-market insider purchases (SEC Form 4)"
+          subtitle="Form 4 filings — direct from SEC EDGAR, no key"
           accent="text-emerald-400"
           onRefresh={loadInsiders}
           loading={loading.ins}
         >
           {loading.ins && insiders.length === 0 ? (
-            <LoadingRow label="Reading insider filings…" />
+            <LoadingRow label="Reading SEC filings…" />
           ) : errors.ins ? (
             <div className="flex items-center space-x-2 text-amber-400 text-xs font-mono py-4 justify-center">
               <AlertTriangle className="w-4 h-4" />
-              <span>{errors.ins === 'KEY_MISSING' ? 'Vault key required.' : errors.ins}</span>
+              <span>{errors.ins}</span>
             </div>
+          ) : insiders.length === 0 ? (
+            <EmptyRow label="No recent filings" />
           ) : (
-            <RawTable rows={insiders} prefer={['symbol', 'transaction_date', 'insider', 'reporting_owner', 'type', 'shares', 'price']} maxRows={10} />
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              {insiders.map((p, i) => (
+                <a
+                  key={i}
+                  href={p.link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block p-2.5 rounded-lg bg-slate-950 border border-slate-800 hover:border-emerald-500/50 transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-mono font-bold text-slate-200 truncate">
+                        {p.insider} <span className="text-slate-500 font-normal">→</span>{' '}
+                        <span className="text-emerald-300">{p.ticker}</span>
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-500 truncate">{p.issuer}</div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-[10px] font-mono text-slate-400">Form {p.form}</div>
+                      <div className="text-[10px] font-mono text-slate-600">{p.filed}</div>
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
           )}
+          <div className="mt-3 text-[10px] font-mono text-slate-600">
+            Source: SEC EDGAR full-text search (efts.sec.gov) · <span className="text-emerald-400 font-bold">DIRECT</span> · links open the actual filing
+          </div>
         </Section>
       </div>
 

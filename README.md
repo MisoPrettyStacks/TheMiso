@@ -70,31 +70,32 @@ To use the AI features in production, host `server.ts` on a Node host (e.g. Rend
 Railway, Fly.io, a VPS) with `GEMINI_API_KEY` set, build the frontend with the API
 base URL pointing at it, and serve `dist/` from the same server.
 
-## Market-structure data layer (London Strategic Edge)
+## Market-structure data layer (direct primaries + London Strategic Edge)
 
-The **Market Structure** tab and several backend enrichments are powered by the
-London Strategic Edge (LSE) market-data vault — a read-only provider. Get a free
-key at https://londonstrategicedge.com/free-market-data-api/ (candles, reference
-datasets and live stream, no tiers), then either:
+The **Market Structure** tab runs on **direct primary sources first** — free,
+keyless, straight from the originating agencies (`/api/direct/*`, `server/direct.ts`):
 
-- paste it into the in-app **Key Vault** under the **LSE** provider (stored in
-  browser localStorage, sent as the `x-lse-key` header), or
-- set `LSE_API_KEY` in the server environment.
-
-What it adds, and where it lands in the system model:
-
-| LSE dataset | Where it goes | System-model use |
+| Direct source | Endpoint | What it replaces |
 |---|---|---|
-| Deep historical candles (stocks→2003, forex→2009, crypto→2017) | `GET /api/lse/candles` | Backtest/validate scenario projections against real history instead of hypotheticals |
-| Multi-asset benchmark pack (indices, FX, commodities, crypto, yields, CPI, Fed funds) | Market Structure tab → Benchmark Tape; injected into AI briefing + war-room prompts | Cross-asset regime calibration — the tape the transmission pipelines transmit *through* |
-| Economic calendar | Market Structure tab → Policy Calendar; auto-injected as dispatches into `GET /api/live/osint-feed` | Scheduled macro catalysts treated as first-class intel events (CPI/FOMC flagged HOT) |
-| COT positioning | Market Structure tab → COT Positioning | Speculative net-bias extremes feed pipeline forecasts (crowded-long = squeeze fuel) |
-| Options flow (large prints, IV, greeks) | Market Structure tab → Smart-Money Flow | Institutional footprint telemetry alongside the on-chain signals |
-| Insider trades (Form 4) | Market Structure tab → Insider Tape | Corporate-insider conviction signal for dossier context |
-| Bond yields / macro series | `GET /api/lse/series` | Duration and policy-stance inputs for the macro-transmission analysis |
+| CFTC Commitments of Traders (cftc.gov) | `GET /api/direct/cot` | COT positioning — managed-money / noncommercial net bias, no middleman |
+| SEC EDGAR full-text search (efts.sec.gov) | `GET /api/direct/insider` | Insider tape — recent Form 4 filings with links to the actual filings |
+| U.S. Treasury par yield curve (home.treasury.gov) | `GET /api/direct/yields` | Bond yields — 2Y/5Y/10Y/30Y + 2s10s spread, direct from Treasury |
+| Nasdaq historical API (api.nasdaq.com) | `GET /api/direct/history?symbol=AAPL` | Stock/ETF/index daily history, direct from the exchange |
+| FRED / Binance / Coinbase | (existing) | Macro series + crypto — already direct |
 
-Without a key every LSE surface degrades gracefully (typed `LSE_KEY_MISSING`
-responses, vault-gate UI) — nothing else breaks.
+Two datasets have **no free primary equivalent**, so they stay on the London
+Strategic Edge vault (read-only, free key at
+https://londonstrategicedge.com/free-market-data-api/ — paste into the Key Vault
+under the **LSE** provider or set `LSE_API_KEY`):
+
+| LSE dataset | Where it goes | Why it stays on LSE |
+|---|---|---|
+| Multi-asset benchmark pack (indices, FX, commodities, crypto) | Market Structure → Benchmark Tape; injected into AI briefing + war-room prompts | One-call convenience across asset classes |
+| Economic calendar | Market Structure → Policy Calendar; auto-injected as dispatches into `GET /api/live/osint-feed` | No unified free primary calendar API exists |
+| Options flow (large prints, IV, greeks) | Market Structure → Smart-Money Flow | The options tape (OPRA) is paid; no free primary |
+
+Without an LSE key those three sections show a vault gate — the direct sections
+(COT, yields, insider tape) work regardless. Nothing else breaks.
 
 ## Environment variables
 

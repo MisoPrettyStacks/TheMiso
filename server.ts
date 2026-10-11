@@ -20,6 +20,7 @@ import {
   lseMacroSnapshotText,
   LseError,
 } from './server/lse';
+import { directCot, directYields, directInsiderBuys, directStockHistory } from './server/direct';
 
 dotenv.config();
 
@@ -1167,6 +1168,51 @@ app.get('/api/lse/cot', async (req, res) => {
     res.json({ success: true, count: rows.length, rows });
   } catch (err: any) {
     lseRouteError(res, err);
+  }
+});
+
+// ── Direct primary-source layer (no middleman) ──────────────────────────────
+// Free, keyless, straight from the originating agencies/exchanges:
+// CFTC (positioning), SEC EDGAR (insider filings), U.S. Treasury (yields),
+// Nasdaq (stock/ETF history). No LSE key needed for any of these.
+
+app.get('/api/direct/cot', async (req, res) => {
+  try {
+    const { symbols = 'ES,NQ,GC,CL,ZW' } = req.query as any;
+    const rows = await directCot(`${symbols}`.split(',').map((s) => s.trim()).slice(0, 10));
+    res.json({ success: true, direct: true, source: 'CFTC Commitments of Traders (cftc.gov)', count: rows.length, rows });
+  } catch (err: any) {
+    res.status(502).json({ success: false, error: err?.message || 'CFTC fetch failed' });
+  }
+});
+
+app.get('/api/direct/yields', async (_req, res) => {
+  try {
+    const curve = await directYields();
+    res.json({ success: true, direct: true, ...curve });
+  } catch (err: any) {
+    res.status(502).json({ success: false, error: err?.message || 'Treasury yield fetch failed' });
+  }
+});
+
+app.get('/api/direct/insider', async (req, res) => {
+  try {
+    const { limit = '12' } = req.query as any;
+    const rows = await directInsiderBuys(Math.min(parseInt(limit, 10) || 12, 40));
+    res.json({ success: true, direct: true, source: 'SEC EDGAR full-text search (efts.sec.gov)', count: rows.length, rows });
+  } catch (err: any) {
+    res.status(502).json({ success: false, error: err?.message || 'SEC EDGAR fetch failed' });
+  }
+});
+
+app.get('/api/direct/history', async (req, res) => {
+  try {
+    const { symbol, fromdate = '2024-01-01' } = req.query as any;
+    if (!symbol) return res.status(400).json({ success: false, error: 'symbol is required (e.g. AAPL, SPY, ^GSPC)' });
+    const data = await directStockHistory(symbol, fromdate);
+    res.json({ success: true, direct: true, ...data, count: data.bars.length });
+  } catch (err: any) {
+    res.status(502).json({ success: false, error: err?.message || 'history fetch failed' });
   }
 });
 
