@@ -1074,7 +1074,20 @@ app.get('/api/download-source-zip', async (req, res) => {
 
 // Setup Vite middleware in dev or static serving in prod
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
+  const distPath = path.join(__dirname, 'dist');
+  const distIndex = path.join(distPath, 'index.html');
+  const distExists = fs.existsSync(distIndex);
+  console.log(`[boot] NODE_ENV=${process.env.NODE_ENV || '(unset)'} dist=${distExists ? 'present' : 'MISSING'}`);
+
+  if (distExists) {
+    // Built frontend present — serve it (regardless of NODE_ENV).
+    app.use(express.static(distPath));
+    // SPA fallback — but never swallow /api routes.
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/')) return next();
+      res.sendFile(distIndex);
+    });
+  } else if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -1082,9 +1095,11 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(__dirname, 'dist')));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    // Production API-only mode (frontend on GitHub Pages) — no bare 404.
+    app.get('/', (_req, res) => {
+      res.type('text').send(
+        'TheMiso API is running. The app frontend is hosted on GitHub Pages: https://misoprettystacks.github.io/TheMiso/'
+      );
     });
   }
 
