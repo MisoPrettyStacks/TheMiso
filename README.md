@@ -70,11 +70,38 @@ To use the AI features in production, host `server.ts` on a Node host (e.g. Rend
 Railway, Fly.io, a VPS) with `GEMINI_API_KEY` set, build the frontend with the API
 base URL pointing at it, and serve `dist/` from the same server.
 
+## Market-structure data layer (London Strategic Edge)
+
+The **Market Structure** tab and several backend enrichments are powered by the
+London Strategic Edge (LSE) market-data vault — a read-only provider. Get a free
+key at https://londonstrategicedge.com/free-market-data-api/ (candles, reference
+datasets and live stream, no tiers), then either:
+
+- paste it into the in-app **Key Vault** under the **LSE** provider (stored in
+  browser localStorage, sent as the `x-lse-key` header), or
+- set `LSE_API_KEY` in the server environment.
+
+What it adds, and where it lands in the system model:
+
+| LSE dataset | Where it goes | System-model use |
+|---|---|---|
+| Deep historical candles (stocks→2003, forex→2009, crypto→2017) | `GET /api/lse/candles` | Backtest/validate scenario projections against real history instead of hypotheticals |
+| Multi-asset benchmark pack (indices, FX, commodities, crypto, yields, CPI, Fed funds) | Market Structure tab → Benchmark Tape; injected into AI briefing + war-room prompts | Cross-asset regime calibration — the tape the transmission pipelines transmit *through* |
+| Economic calendar | Market Structure tab → Policy Calendar; auto-injected as dispatches into `GET /api/live/osint-feed` | Scheduled macro catalysts treated as first-class intel events (CPI/FOMC flagged HOT) |
+| COT positioning | Market Structure tab → COT Positioning | Speculative net-bias extremes feed pipeline forecasts (crowded-long = squeeze fuel) |
+| Options flow (large prints, IV, greeks) | Market Structure tab → Smart-Money Flow | Institutional footprint telemetry alongside the on-chain signals |
+| Insider trades (Form 4) | Market Structure tab → Insider Tape | Corporate-insider conviction signal for dossier context |
+| Bond yields / macro series | `GET /api/lse/series` | Duration and policy-stance inputs for the macro-transmission analysis |
+
+Without a key every LSE surface degrades gracefully (typed `LSE_KEY_MISSING`
+responses, vault-gate UI) — nothing else breaks.
+
 ## Environment variables
 
 | Variable | Required for | Description |
 |---|---|---|
 | `GEMINI_API_KEY` | Backend AI routes | Google Gemini API key — server-side only |
+| `LSE_API_KEY` | Market-structure routes (optional) | London Strategic Edge vault key — server-side alternative to the in-app Key Vault |
 | `PORT` | Backend | Port the Express server listens on (default 3000) |
 
 ## Notes

@@ -83,6 +83,15 @@ export const DEFAULT_PROVIDERS: Omit<ApiProviderConfig, 'slots'>[] = [
     keyPlaceholder: '32-character hex key',
   },
   {
+    id: 'lse',
+    name: 'London Strategic Edge (Market Data Vault)',
+    category: 'MACRO_DATA',
+    description: 'Deep multi-asset market history (stocks, forex, crypto, commodities, indices, ETFs back to 2003), macro series, bond yields, COT positioning, insider trades, economic calendar, and options flow. Powers the Market Structure tab, macro-wire dispatches, and grounds AI briefings in live cross-asset levels.',
+    freeTierInfo: 'Free key at londonstrategicedge.com — OHLCV candles, reference datasets and live stream, no tiers to manage.',
+    docsUrl: 'https://londonstrategicedge.com/free-market-data-api/',
+    keyPlaceholder: 'lse_live_...',
+  },
+  {
     id: 'nasa_firms',
     name: 'NASA FIRMS Satellite Telemetry',
     category: 'GEOSPATIAL_TELEMETRY',

@@ -9,10 +9,11 @@ import { AIDossierModal } from './components/AIDossierModal';
 import { DisclaimerModal } from './components/DisclaimerModal';
 import { ApiVaultModal } from './components/ApiVaultModal';
 import { LiveCryptoTicker } from './components/LiveCryptoTicker';
+import { MarketsView } from './components/MarketsView';
 import { PipelineItem } from './data/pipelinesData';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'map' | 'pipelines' | 'osint' | 'scenario' | 'countries'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'pipelines' | 'osint' | 'markets' | 'scenario' | 'countries'>('map');
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);
 
   // Mandatory Disclaimer Popup state (pops up as soon as someone lands on the site)
@@ -103,6 +104,10 @@ export default function App() {
 
         {activeTab === 'osint' && (
           <LiveIntelligenceFeed onSelectPipeline={handleSelectPipeline} />
+        )}
+
+        {activeTab === 'markets' && (
+          <MarketsView onOpenVault={() => setIsVaultOpen(true)} />
         )}
 
         {activeTab === 'scenario' && (

@@ -15,15 +15,16 @@ import {
   Loader2,
   FileArchive,
   CheckCircle2,
-  Key
+  Key,
+  BarChart3
 } from 'lucide-react';
 import { soundEffects } from '../services/soundEffects';
 import { downloadProjectSourceFiles } from '../services/sourceDownloader';
 import { apiVaultService } from '../services/apiVaultService';
 
 interface NavbarProps {
-  activeTab: 'map' | 'pipelines' | 'osint' | 'scenario' | 'countries';
-  setActiveTab: (tab: 'map' | 'pipelines' | 'osint' | 'scenario' | 'countries') => void;
+  activeTab: 'map' | 'pipelines' | 'osint' | 'markets' | 'scenario' | 'countries';
+  setActiveTab: (tab: 'map' | 'pipelines' | 'osint' | 'markets' | 'scenario' | 'countries') => void;
   onOpenAiBriefing: () => void;
   onOpenDisclaimer?: () => void;
   onOpenApiVault?: () => void;
@@ -73,7 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
   };
 
-  const handleTabChange = (tab: 'map' | 'pipelines' | 'osint' | 'scenario' | 'countries') => {
+  const handleTabChange = (tab: 'map' | 'pipelines' | 'osint' | 'markets' | 'scenario' | 'countries') => {
     soundEffects.playTick();
     setActiveTab(tab);
   };
@@ -220,6 +221,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Radio className="w-3.5 h-3.5" />
             <span>LIVE ON-CHAIN OSINT</span>
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('markets')}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium font-mono transition-all ${
+              activeTab === 'markets'
+                ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>MARKET STRUCTURE</span>
           </button>
 
           <button
