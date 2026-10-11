@@ -10,10 +10,6 @@
  *   Stock/ETF history → Nasdaq historical API (api.nasdaq.com)
  *   Macro series      → FRED (already direct via the fred vault provider)
  *   Crypto prices     → Binance / Coinbase (already direct)
- *
- * Two LSE datasets have NO free primary equivalent, so they stay on the
- * LSE vault and are labeled as such in the UI: the economic calendar
- * (no unified free primary API exists) and options flow (OPRA tape is paid).
  */
 
 const UA = 'MISOCRYPTO-Platform research (contact: research@localhost)';

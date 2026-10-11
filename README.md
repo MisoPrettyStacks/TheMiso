@@ -83,26 +83,14 @@ keyless, straight from the originating agencies (`/api/direct/*`, `server/direct
 | Nasdaq historical API (api.nasdaq.com) | `GET /api/direct/history?symbol=AAPL` | Stock/ETF/index daily history, direct from the exchange |
 | FRED / Binance / Coinbase | (existing) | Macro series + crypto — already direct |
 
-Two datasets have **no free primary equivalent**, so they stay on the London
-Strategic Edge vault (read-only, free key at
-https://londonstrategicedge.com/free-market-data-api/ — paste into the Key Vault
-under the **LSE** provider or set `LSE_API_KEY`):
-
-| LSE dataset | Where it goes | Why it stays on LSE |
-|---|---|---|
-| Multi-asset benchmark pack (indices, FX, commodities, crypto) | Market Structure → Benchmark Tape; injected into AI briefing + war-room prompts | One-call convenience across asset classes |
-| Economic calendar | Market Structure → Policy Calendar; auto-injected as dispatches into `GET /api/live/osint-feed` | No unified free primary calendar API exists |
-| Options flow (large prints, IV, greeks) | Market Structure → Smart-Money Flow | The options tape (OPRA) is paid; no free primary |
-
-Without an LSE key those three sections show a vault gate — the direct sections
-(COT, yields, insider tape) work regardless. Nothing else breaks.
+All market-structure data comes direct from primary sources — no middleman,
+no vault key required.
 
 ## Environment variables
 
 | Variable | Required for | Description |
 |---|---|---|
 | `GEMINI_API_KEY` | Backend AI routes | Google Gemini API key — server-side only |
-| `LSE_API_KEY` | Market-structure routes (optional) | London Strategic Edge vault key — server-side alternative to the in-app Key Vault |
 | `PORT` | Backend | Port the Express server listens on (default 3000) |
 
 ## Notes
