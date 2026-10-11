@@ -421,9 +421,9 @@ export const LiveIntelligenceFeed: React.FC<LiveIntelligenceFeedProps> = ({ onSe
                   </div>
 
                   <div className="flex items-center space-x-4">
-                    {evt.sourceUrl && (
+                    {evt.sourceUrl && /^https?:\/\//i.test(evt.sourceUrl.trim()) && (
                       <a
-                        href={evt.sourceUrl}
+                        href={evt.sourceUrl.trim()}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center space-x-1 text-cyan-400 hover:text-cyan-300 underline text-[11px] transition-colors"

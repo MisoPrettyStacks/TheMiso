@@ -892,10 +892,12 @@ app.get('/api/live/osint-feed', async (_req, res) => {
         const itemMatches = text.match(/<item>([\s\S]*?)<\/item>/g);
         if (itemMatches && itemMatches.length > 0) {
           const parsedItems = itemMatches.slice(0, 6).map((rawItem, idx) => {
-            const title = rawItem.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1] ||
-                          rawItem.match(/<title>(.*?)<\/title>/)?.[1] || 'Breaking Crypto Wire';
-            const link = rawItem.match(/<link>(.*?)<\/link>/)?.[1] ||
-                         rawItem.match(/<guid.*?>(.*?)<\/guid>/)?.[1] || 'https://cointelegraph.com';
+            const stripCdata = (s: string) =>
+              s.replace(/^\s*<!\[CDATA\[/, '').replace(/\]\]>\s*$/, '').trim();
+            const title = stripCdata(rawItem.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1] ||
+                          rawItem.match(/<title>(.*?)<\/title>/)?.[1] || 'Breaking Crypto Wire');
+            const link = stripCdata(rawItem.match(/<link>(.*?)<\/link>/)?.[1] ||
+                         rawItem.match(/<guid.*?>(.*?)<\/guid>/)?.[1] || 'https://cointelegraph.com');
             const pubDate = rawItem.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || new Date().toISOString();
             const desc = (rawItem.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/)?.[1] ||
                           rawItem.match(/<description>(.*?)<\/description>/)?.[1] || '')
