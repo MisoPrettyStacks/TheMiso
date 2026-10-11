@@ -23,6 +23,36 @@ import { MACRO_PIPELINES, PIPELINE_CATEGORIES, PipelineItem } from '../data/pipe
 import { soundEffects } from '../services/soundEffects';
 import { downloadProjectSourceFiles } from '../services/sourceDownloader';
 
+/**
+ * Convert a relative squeeze horizon ("1-3 Weeks", "12-72 Hours") into an
+ * absolute calendar window anchored at today, e.g. "Oct 18 – Nov 1, 2026".
+ * Returns null when the horizon string doesn't parse.
+ */
+function horizonDateWindow(horizon: string): string | null {
+  const m = horizon.match(/(\d+)\s*-\s*(\d+)\s*(hours?|days?|weeks?|months?)/i);
+  if (!m) return null;
+  const min = parseInt(m[1], 10);
+  const max = parseInt(m[2], 10);
+  const unit = m[3].toLowerCase();
+  const daysPer: number = unit.startsWith('hour') ? 1 / 24
+    : unit.startsWith('day') ? 1
+    : unit.startsWith('week') ? 7
+    : 30.44;
+  const now = Date.now();
+  const start = new Date(now + min * daysPer * 86400000);
+  const end = new Date(now + max * daysPer * 86400000);
+  const fmtMD = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const endStr = sameYear ? fmtMD(end) : end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `${fmtMD(start)} – ${endStr}, ${end.getFullYear()}`;
+}
+
+/** "2026-10-11" -> "Oct 11, 2026" */
+function fmtReviewDate(iso: string): string {
+  const d = new Date(iso + 'T12:00:00');
+  return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 interface PipelinesBriefingViewProps {
   onOpenPipelineModal: (pipeline: PipelineItem, shockMultiplier: number) => void;
   selectedPipelineId?: number | null;
@@ -259,8 +289,18 @@ export const PipelinesBriefingView: React.FC<PipelinesBriefingViewProps> = ({
                     <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-400">
                       <div className="flex items-center space-x-1 text-amber-300/90">
                         <Clock className="w-3.5 h-3.5" />
-                        <span>SQUEEZE HORIZON: <strong>{pipeline.horizon}</strong></span>
+                        <span>SQUEEZE HORIZON: <strong>{pipeline.horizon}</strong>
+                          {(() => {
+                            const window = horizonDateWindow(pipeline.horizon);
+                            return window ? <span className="text-slate-400 font-normal"> · {window}</span> : null;
+                          })()}
+                        </span>
                       </div>
+                      <span className="text-slate-600">•</span>
+                      <span className="flex items-center space-x-1">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400/80" />
+                        <span>VALIDATED: <strong className="text-emerald-300/90">{fmtReviewDate(pipeline.lastReviewed)}</strong></span>
+                      </span>
                       <span className="text-slate-600">•</span>
                       <span>REGION: <strong className="text-slate-300">{pipeline.geopoliticalRegion}</strong></span>
                     </div>
