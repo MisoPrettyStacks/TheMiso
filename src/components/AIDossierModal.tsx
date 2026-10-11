@@ -17,6 +17,7 @@ import {
 import { PipelineItem } from '../data/pipelinesData';
 import { soundEffects } from '../services/soundEffects';
 import { apiVaultService } from '../services/apiVaultService';
+import { api } from '../services/apiBase';
 
 interface AIDossierModalProps {
   isOpen: boolean;
@@ -50,7 +51,7 @@ export const AIDossierModal: React.FC<AIDossierModalProps> = ({
         const vaultKeys = apiVaultService.getVaultSummaryForRequests();
 
         if (mode === 'BRIEFING') {
-          const res = await fetch('/api/ai/briefing', {
+          const res = await fetch(api('/api/ai/briefing'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -64,7 +65,7 @@ export const AIDossierModal: React.FC<AIDossierModalProps> = ({
             setSourceEngine(json.source || 'gemini');
           }
         } else if (mode === 'PIPELINE_FORECAST' && pipeline) {
-          const res = await fetch('/api/ai/pipeline-forecast', {
+          const res = await fetch(api('/api/ai/pipeline-forecast'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

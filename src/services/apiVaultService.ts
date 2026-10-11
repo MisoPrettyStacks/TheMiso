@@ -1,3 +1,5 @@
+import { api } from './apiBase';
+
 export interface ApiSlot {
   slotNumber: number; // 1, 2, 3, 4
   key: string;
@@ -267,7 +269,7 @@ class ApiVaultService {
     const startTime = performance.now();
 
     try {
-      const response = await fetch('/api/vault/test-key', {
+      const response = await fetch(api('/api/vault/test-key'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

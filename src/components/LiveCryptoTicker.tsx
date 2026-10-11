@@ -16,6 +16,7 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 import { soundEffects } from '../services/soundEffects';
+import { api } from '../services/apiBase';
 
 export interface CryptoPriceData {
   price: number;
@@ -201,7 +202,7 @@ export const LiveCryptoTicker: React.FC<LiveCryptoTickerProps> = ({
 
     // 1. Tier 1: Local Server Multi-Oracle Endpoint
     try {
-      const res = await fetch('/api/live/prices');
+      const res = await fetch(api('/api/live/prices'));
       if (res.ok) {
         const data = await res.json();
         if (data.prices && Object.keys(data.prices).length > 0) {

@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { api } from './apiBase';
 
 export interface DownloadProgress {
   status: 'idle' | 'preparing' | 'downloading' | 'completed' | 'error';
@@ -16,7 +17,7 @@ export async function downloadProjectSourceFiles(
 
   try {
     // 1. First attempt: Direct stream from backend /api/download-source-zip
-    const response = await fetch('/api/download-source-zip');
+    const response = await fetch(api('/api/download-source-zip'));
     if (response.ok) {
       onProgress?.({ status: 'downloading', message: 'Downloading source package (.zip)...' });
       const blob = await response.blob();

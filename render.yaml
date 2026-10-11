@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: themiso-api
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: CORS_ORIGIN
+        value: https://misoprettystacks.github.io
+      # Optional: paste a Gemini key in the Render dashboard for AI features
+      # - key: GEMINI_API_KEY
+      #   sync: false

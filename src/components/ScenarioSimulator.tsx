@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { soundEffects } from '../services/soundEffects';
 import { apiVaultService } from '../services/apiVaultService';
+import { api } from '../services/apiBase';
 
 interface ScenarioSimulatorProps {
   onSelectPipeline: (pipelineId: number) => void;
@@ -90,7 +91,7 @@ export const ScenarioSimulator: React.FC<ScenarioSimulatorProps> = ({ onSelectPi
     soundEffects.playSonar();
     try {
       const vaultKeys = apiVaultService.getVaultSummaryForRequests();
-      const res = await fetch('/api/ai/simulate-scenario', {
+      const res = await fetch(api('/api/ai/simulate-scenario'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

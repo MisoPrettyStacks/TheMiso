@@ -1,8 +1,10 @@
+import { api } from './apiBase';
+
 /**
  * directService — frontend client for the direct primary-source layer.
  *
- * Same-origin proxy (/api/direct/*). No keys, no middleman: CFTC, SEC EDGAR,
- * U.S. Treasury, and Nasdaq, straight from the source.
+ * Proxies through the backend (/api/direct/*). No keys, no middleman: CFTC,
+ * SEC EDGAR, U.S. Treasury, and Nasdaq, straight from the source.
  */
 
 async function directGet<T = any>(path: string, params: Record<string, string | number | undefined> = {}): Promise<T> {
@@ -10,7 +12,7 @@ async function directGet<T = any>(path: string, params: Record<string, string | 
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined && v !== null && `${v}`.length > 0) qs.set(k, `${v}`);
   }
-  const res = await fetch(`/api/direct${path}${qs.toString() ? `?${qs}` : ''}`);
+  const res = await fetch(api(`/api/direct${path}${qs.toString() ? `?${qs}` : ''}`));
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.success === false) {
     throw new Error(data.error || `Direct source request failed (${res.status})`);

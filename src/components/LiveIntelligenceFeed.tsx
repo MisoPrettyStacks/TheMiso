@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { INITIAL_OSINT_EVENTS, OsintEvent } from '../data/osintEvents';
 import { soundEffects } from '../services/soundEffects';
+import { api } from '../services/apiBase';
 
 interface LiveIntelligenceFeedProps {
   onSelectPipeline: (pipelineId: number) => void;
@@ -40,7 +41,7 @@ export const LiveIntelligenceFeed: React.FC<LiveIntelligenceFeedProps> = ({ onSe
     setIsRefreshing(true);
     soundEffects.playTick();
     try {
-      const res = await fetch('/api/live/osint-feed');
+      const res = await fetch(api('/api/live/osint-feed'));
       if (res.ok) {
         const data = await res.json();
         setLastSynced(new Date().toLocaleTimeString());

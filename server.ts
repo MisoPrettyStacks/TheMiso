@@ -17,6 +17,22 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json({ limit: '2mb' }));
 
+// CORS: the production frontend lives on GitHub Pages (static) while this API
+// runs on Render. Allow the Pages origin (and any origin when CORS_ORIGIN is
+// set explicitly). Same-origin dev needs nothing.
+const corsOrigin = process.env.CORS_ORIGIN || 'https://misoprettystacks.github.io';
+app.use((req, res, next) => {
+  const origin = req.headers.origin as string | undefined;
+  if (origin && (origin === corsOrigin || process.env.CORS_ORIGIN === '*')) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-lse-key');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 // Graceful degradation: AI endpoints stay alive without a server key and report a
 // clear JSON error instead of crashing or silently degrading. User-supplied vault
 // keys (the multi-tier failover pipeline) still work when provided.
