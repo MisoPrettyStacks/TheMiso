@@ -45,6 +45,13 @@ const MAP_PROVIDERS = {
     attribution: 'Tiles &copy; Esri &mdash; Earthstar Geographics',
     maxZoom: 18
   },
+  street: {
+    name: 'STREET DETAIL',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    subdomains: 'abc',
+    attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community',
+    maxZoom: 19
+  },
   osm: {
     name: 'NAUTICAL / OSM',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -118,7 +125,7 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
   const markersLayerGroup = useRef<L.LayerGroup | null>(null);
   const routesLayerGroup = useRef<L.LayerGroup | null>(null);
 
-  const [activeTileKey, setActiveTileKey] = useState<'tactical' | 'satellite' | 'osm'>('tactical');
+  const [activeTileKey, setActiveTileKey] = useState<'tactical' | 'satellite' | 'street' | 'osm'>('tactical');
   const [selectedTheater, setSelectedTheater] = useState<string>('GLOBAL');
   const [selectedLayer, setSelectedLayer] = useState<'ALL' | 'MINING' | 'DEFI' | 'SOVEREIGN' | 'MEV' | 'AI'>('ALL');
   const [showShippingLanes, setShowShippingLanes] = useState<boolean>(true);
@@ -132,7 +139,7 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
   });
 
   // Tile URL — all three providers are free and keyless.
-  const getTileUrl = (providerKey: 'tactical' | 'satellite' | 'osm') => {
+  const getTileUrl = (providerKey: 'tactical' | 'satellite' | 'street' | 'osm') => {
     return MAP_PROVIDERS[providerKey].url;
   };
 
@@ -255,10 +262,10 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
       const customIcon = L.divIcon({
         className: 'custom-chokepoint-icon',
         html: `
-          <div class="relative flex items-center justify-center cursor-pointer group" style="width: 32px; height: 32px;">
+          <div class="relative flex items-center justify-center cursor-pointer group" style="width: 24px; height: 24px;">
             <div class="absolute inset-0 rounded-full animate-ping opacity-60" style="background-color: ${pulseColor};"></div>
-            <div class="relative w-7 h-7 rounded-full border-2 border-white/80 ${badgeBg} flex items-center justify-center shadow-lg transition-transform transform group-hover:scale-125">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <div class="relative w-5 h-5 rounded-full border-2 border-white/80 ${badgeBg} flex items-center justify-center shadow-lg transition-transform transform group-hover:scale-125">
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="5" r="3"></circle>
                 <line x1="12" y1="22" x2="12" y2="8"></line>
                 <path d="M5 12H2a10 10 0 0 0 20 0h-3"></path>
@@ -269,8 +276,8 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
             </div>
           </div>
         `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
       });
 
       const marker = L.marker([choke.lat, choke.lon], { icon: customIcon });
@@ -313,18 +320,18 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
       const customIcon = L.divIcon({
         className: 'custom-event-icon',
         html: `
-          <div class="relative flex items-center justify-center cursor-pointer group" style="width: 26px; height: 26px;">
+          <div class="relative flex items-center justify-center cursor-pointer group" style="width: 20px; height: 20px;">
             <div class="absolute inset-0 rounded-full animate-ping opacity-40" style="background-color: ${markerColor};"></div>
-            <div class="w-5 h-5 rounded-full border border-slate-950 flex items-center justify-center shadow-md transition-transform transform group-hover:scale-125" style="background-color: ${markerColor};">
-              <span class="w-1.5 h-1.5 bg-white rounded-full"></span>
+            <div class="w-4 h-4 rounded-full border border-slate-950 flex items-center justify-center shadow-md transition-transform transform group-hover:scale-125" style="background-color: ${markerColor};">
+              <span class="w-1 h-1 bg-white rounded-full"></span>
             </div>
             <div class="absolute -bottom-5 whitespace-nowrap bg-slate-950/90 text-[9px] font-mono font-medium px-1.5 py-0.5 rounded border border-slate-700 text-slate-200 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50">
               ${evt.title.slice(0, 24)}...
             </div>
           </div>
         `,
-        iconSize: [26, 26],
-        iconAnchor: [13, 13]
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
       });
 
       const marker = L.marker([evt.lat, evt.lon], { icon: customIcon });
@@ -426,7 +433,7 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
                 <Globe className="w-3.5 h-3.5 text-emerald-400" />
                 <span>MAP TILE:</span>
               </span>
-              {(['tactical', 'satellite', 'osm'] as const).map((key) => (
+              {(['tactical', 'satellite', 'street', 'osm'] as const).map((key) => (
                 <button
                   key={key}
                   onClick={() => {
