@@ -107,7 +107,7 @@ export default function App() {
         )}
 
         {activeTab === 'markets' && (
-          <MarketsView onOpenVault={() => setIsVaultOpen(true)} />
+          <MarketsView />
         )}
 
         {activeTab === 'scenario' && (

@@ -5,21 +5,6 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import JSZip from 'jszip';
-import {
-  resolveLseKey,
-  lseTestKey,
-  lseStatus,
-  lseCandles,
-  lseSeries,
-  lseRef,
-  lseOptionsFlow,
-  lseOptionsChain,
-  lseMacroPack,
-  lseUpcomingEvents,
-  lseCotSnapshot,
-  lseMacroSnapshotText,
-  LseError,
-} from './server/lse';
 import { directCot, directYields, directInsiderBuys, directStockHistory } from './server/direct';
 
 dotenv.config();
@@ -252,18 +237,6 @@ app.post('/api/vault/test-key', async (req, res) => {
       } else {
         return res.status(400).json({ success: false, error: `FRED status: ${fredRes.status}` });
       }
-    } else if (providerId === 'lse') {
-      try {
-        const result = await lseTestKey(trimmedKey);
-        return res.json({ success: true, message: result.message });
-      } catch (err: any) {
-        const isRateLimit = err?.status === 429;
-        return res.status(400).json({
-          success: false,
-          isRateLimit,
-          error: `LSE vault: ${err?.message || 'key rejected'}`,
-        });
-      }
     } else if (providerId === 'nasa_firms') {
       const firmsRes = await fetch(
         `https://firms.modaps.eosdis.nasa.gov/api/country/csv/${trimmedKey}/VIIRS_SNPP_NRT/USA/1`
@@ -315,25 +288,10 @@ app.post('/api/ai/briefing', async (req, res) => {
       return res.status(503).json(AI_NOT_CONFIGURED);
     }
 
-    // LSE cross-asset snapshot: grounds the briefing in live market structure
-    // (indices, FX, commodities, yields, CPI, Fed funds) when a key is present.
-    // Best-effort — the briefing works fine without it.
-    let lseContext = '';
-    try {
-      const lseKey = (process.env.LSE_API_KEY || vaultKeys?.lse?.[0] || '').trim() || null;
-      const snap = await lseMacroSnapshotText(lseKey);
-      if (snap) {
-        lseContext = `\n${snap}\nWeave these live levels into the briefing — cite actual prints, never placeholders.\n`;
-      }
-    } catch {
-      /* briefing proceeds without the macro snapshot */
-    }
-
     const prompt = `You are the Chief Quantitative Analyst of MISOCRYPTO, an elite institutional crypto, digital, and blockchain asset intelligence desk.
 Generate a comprehensive, institutional-grade digital asset intelligence briefing.
 Category focus: ${category || 'Crypto & On-Chain Macro Transmission Cascades'}.
 Region focus: ${focusRegion || 'Global Blockchain & Validator Networks'}.
-${lseContext}
 
 Format your response strictly as valid JSON with the following structure:
 {
@@ -533,25 +491,11 @@ app.post('/api/ai/simulate-scenario', async (req, res) => {
       return res.status(503).json(AI_NOT_CONFIGURED);
     }
 
-    // LSE cross-asset snapshot: anchors the wargame in current market regime
-    // (risk appetite, yields, dollar) instead of a vacuum. Best-effort.
-    let lseContext = '';
-    try {
-      const lseKey = (process.env.LSE_API_KEY || vaultKeys?.lse?.[0] || '').trim() || null;
-      const snap = await lseMacroSnapshotText(lseKey);
-      if (snap) {
-        lseContext = `\n${snap}\nCalibrate the cascade against this live regime — a risk-off tape with spiking yields transmits shocks differently than a risk-on tape.\n`;
-      }
-    } catch {
-      /* simulation proceeds without the macro snapshot */
-    }
-
     const prompt = `You are a Senior Quantitative Wargame Analyst for Crypto, Digital, and Blockchain Systems.
 Analyze this escalation scenario:
 Scenario: "${scenarioTitle}"
 Details: "${scenarioDetails}"
 Escalation Level: ${escalationLevel || 3}/5
-${lseContext}
 
 Simulate the on-chain systemic domino cascade, timeline progression, digital asset price dislocations, and activated crypto transmission pipelines.
 Output strictly valid JSON with this structure:
@@ -999,44 +943,7 @@ app.get('/api/live/osint-feed', async (_req, res) => {
       console.warn('Crypto RSS live feed fetch non-fatal:', e);
     }
 
-    // 4. PRIMARY MACRO SOURCE: LSE economic-calendar events as intel dispatches.
-    // Upcoming CPI / FOMC / payroll prints are market-moving "events" the same
-    // way a pipeline incident is — they belong on the wire. Non-fatal: the
-    // feed works fine without an LSE key.
-    try {
-      const lseKey = resolveLseKey(_req);
-      if (lseKey) {
-        const events = await lseUpcomingEvents(lseKey, 7, 12);
-        const hot = /cpi|inflation|fomc|fed|payroll|nonfarm|nfp|rate decision|gdp|pce|ppi|unemployment/i;
-        for (const ev of events.slice(0, 8)) {
-          const title = ev.event || ev.title || 'Macro release';
-          const when = ev.datetime || ev.date || '';
-          const isHot = hot.test(title);
-          liveDispatches.push({
-            id: `lse-cal-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-            title: `MACRO WIRE: ${title} — ${ev.region || ev.country || 'Global'} ${when ? `@ ${when}` : ''}`.trim(),
-            category: 'Macro & Policy',
-            sourceType: 'PRIMARY',
-            tier: isHot ? 'CRITICAL' : 'ELEVATED',
-            country: ev.country_name || ev.region || 'Global',
-            region: 'Macro Theater',
-            lat: 38.9,
-            lon: -77.03,
-            timestamp: new Date().toISOString(),
-            source: 'LSE Economic Calendar (primary release schedule)',
-            sourceUrl: 'https://londonstrategicedge.com',
-            rawTelemetry: `Event: ${title}; Region: ${ev.region || ev.country || '?'}; Scheduled: ${when}; Forecast: ${ev.forecast ?? '?'}; Previous: ${ev.previous ?? '?'}.`,
-            summary: `SCHEDULED MACRO CATALYST: ${title} prints ${when || 'soon'}. Cross-asset transmission pipelines (risk FX, duration, crypto beta) reprice on surprise vs forecast — position the war-room accordingly.`,
-            affectedTickers: ['SPX', 'DXY', 'US10Y', 'BTC', 'ETH'],
-            pipelineId: 0,
-            pipelineRef: 'Cross-asset macro transmission',
-            verified: true,
-          });
-        }
-      }
-    } catch (e) {
-      console.warn('LSE calendar dispatch injection non-fatal:', (e as any)?.message || e);
-    }
+    // (macro-calendar dispatches were LSE-sourced; removed — direct sources only)
 
     return res.json({
       success: true,
@@ -1053,124 +960,6 @@ app.get('/api/live/osint-feed', async (_req, res) => {
 // Read-only proxy over the LSE vault: deep history, macro series, reference
 // datasets (COT, insider trades, econ calendar…), options flow. Key resolves
 // from LSE_API_KEY env or the x-lse-key header (user's Key Vault key).
-// Every route degrades to a typed 503 when no key is configured.
-
-function lseRouteError(res: any, err: any) {
-  if (err instanceof LseError && !err.configured) {
-    return res.status(503).json({
-      success: false,
-      code: 'LSE_KEY_MISSING',
-      error: err.message,
-      hint: 'Open the Key Vault → add a free London Strategic Edge key (londonstrategicedge.com/free-market-data-api), or set LSE_API_KEY on the server.',
-    });
-  }
-  const status = err?.status && err.status >= 400 && err.status < 600 ? err.status : 502;
-  return res.status(status).json({ success: false, error: err?.message || 'LSE request failed' });
-}
-
-app.get('/api/lse/status', async (req, res) => {
-  try {
-    res.json({ success: true, ...(await lseStatus(resolveLseKey(req))) });
-  } catch (err: any) {
-    lseRouteError(res, err);
-  }
-});
-
-app.get('/api/lse/candles', async (req, res) => {
-  try {
-    const { symbol, timeframe = '1d', start, end, limit = '200', order = 'desc', dataset } = req.query as any;
-    if (!symbol) return res.status(400).json({ success: false, error: 'symbol is required' });
-    const rows = await lseCandles(resolveLseKey(req), symbol, timeframe, {
-      start, end, limit: Math.min(parseInt(limit, 10) || 200, 5000), order, dataset,
-    });
-    res.json({ success: true, symbol, timeframe, count: rows.length, rows });
-  } catch (err: any) {
-    lseRouteError(res, err);
-  }
-});
-
-app.get('/api/lse/series', async (req, res) => {
-  try {
-    const { symbol, start, end, limit = '500', order = 'desc', dataset } = req.query as any;
-    if (!symbol) return res.status(400).json({ success: false, error: 'symbol is required' });
-    const rows = await lseSeries(resolveLseKey(req), symbol, {
-      start, end, limit: Math.min(parseInt(limit, 10) || 500, 5000), order, dataset,
-    });
-    res.json({ success: true, symbol, count: rows.length, rows });
-  } catch (err: any) {
-    lseRouteError(res, err);
-  }
-});
-
-app.get('/api/lse/ref/:dataset', async (req, res) => {
-  try {
-    const { dataset } = req.params;
-    const params: any = { ...req.query };
-    if (params.limit) params.limit = Math.min(parseInt(params.limit, 10) || 50, 500);
-    const rows = await lseRef(resolveLseKey(req), dataset, params);
-    res.json({ success: true, dataset, count: rows.length, rows });
-  } catch (err: any) {
-    lseRouteError(res, err);
-  }
-});
-
-app.get('/api/lse/options/flow', async (req, res) => {
-  try {
-    const params: any = { ...req.query };
-    if (params.limit) params.limit = Math.min(parseInt(params.limit, 10) || 25, 200);
-    const rows = await lseOptionsFlow(resolveLseKey(req), params);
-    res.json({ success: true, count: rows.length, rows });
-  } catch (err: any) {
-    lseRouteError(res, err);
-  }
-});
-
-app.get('/api/lse/options/chain', async (req, res) => {
-  try {
-    const { underlying, ...rest } = req.query as any;
-    if (!underlying) return res.status(400).json({ success: false, error: 'underlying is required' });
-    const rows = await lseOptionsChain(resolveLseKey(req), { underlying, ...rest });
-    res.json({ success: true, underlying, count: rows.length, rows });
-  } catch (err: any) {
-    lseRouteError(res, err);
-  }
-});
-
-/** Curated cross-asset benchmark pack: indices, FX, commodities, crypto + rates/macro. */
-app.get('/api/lse/macro-pack', async (req, res) => {
-  try {
-    res.json(await lseMacroPack(resolveLseKey(req)));
-  } catch (err: any) {
-    lseRouteError(res, err);
-  }
-});
-
-/** Upcoming economic-calendar events (default: next 14 days). */
-app.get('/api/lse/calendar', async (req, res) => {
-  try {
-    const { days = '14', limit = '25', region, event, released } = req.query as any;
-    const rows = await lseUpcomingEvents(resolveLseKey(req), parseInt(days, 10) || 14, Math.min(parseInt(limit, 10) || 25, 100));
-    let filtered = rows;
-    if (region) filtered = filtered.filter((r: any) => `${r.region || r.country || ''}`.toUpperCase().includes(`${region}`.toUpperCase()));
-    if (event) filtered = filtered.filter((r: any) => `${r.event || r.title || ''}`.toLowerCase().includes(`${event}`.toLowerCase()));
-    if (released !== undefined) filtered = filtered.filter((r: any) => `${r.released}` === `${released}`);
-    res.json({ success: true, count: filtered.length, rows: filtered });
-  } catch (err: any) {
-    lseRouteError(res, err);
-  }
-});
-
-/** Latest COT positioning snapshot for major futures. */
-app.get('/api/lse/cot', async (req, res) => {
-  try {
-    const { symbols = 'ES,NQ,GC,CL,ZW' } = req.query as any;
-    const rows = await lseCotSnapshot(resolveLseKey(req), `${symbols}`.split(',').map((s) => s.trim().toUpperCase()).slice(0, 10));
-    res.json({ success: true, count: rows.length, rows });
-  } catch (err: any) {
-    lseRouteError(res, err);
-  }
-});
-
 // ── Direct primary-source layer (no middleman) ──────────────────────────────
 // Free, keyless, straight from the originating agencies/exchanges:
 // CFTC (positioning), SEC EDGAR (insider filings), U.S. Treasury (yields),
