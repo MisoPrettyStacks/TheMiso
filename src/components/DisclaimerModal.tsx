@@ -47,9 +47,6 @@ export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({
               </h2>
             </div>
           </div>
-          <div className="px-2 py-1 rounded bg-amber-900/60 border border-amber-600/50 text-amber-300 text-[10px] font-bold">
-            CONFIDENTIAL // RESTRICTED
-          </div>
         </div>
 
         {/* Scrollable Terms Content */}
