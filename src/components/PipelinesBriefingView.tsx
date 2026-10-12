@@ -526,33 +526,6 @@ export const PipelinesBriefingView: React.FC<PipelinesBriefingViewProps> = ({
             );
           })}
         </div>
-
-        {/* Global Source Files Download Section */}
-        <div className="mt-12 p-6 rounded-xl bg-gradient-to-r from-slate-900 via-slate-900 to-cyan-950/40 border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2 text-xs font-mono text-emerald-400 font-bold uppercase tracking-wider">
-              <FileDown className="w-4 h-4 text-emerald-400" />
-              <span>OPEN SOURCE &amp; CODE EXPORT</span>
-            </div>
-            <h3 className="text-lg font-bold font-mono text-slate-100">
-              Download Full MISOCRYPTO Platform Source Files (.ZIP)
-            </h3>
-            <p className="text-xs font-mono text-slate-400 max-w-2xl leading-relaxed">
-              Includes all React 19 components, real-world Leaflet mapping system, quantitative crypto transmission lag pipelines, real-time on-chain OSINT feeds, and crypto wargame scenario engines. Free to run, modify, and deploy.
-            </p>
-          </div>
-
-          <button
-            onClick={() => {
-              soundEffects.playPipelineOpen();
-              downloadProjectSourceFiles();
-            }}
-            className="whitespace-nowrap px-5 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-mono font-bold text-xs flex items-center space-x-2 shadow-lg shadow-emerald-950/50 transition-all hover:scale-105"
-          >
-            <FileDown className="w-4 h-4 text-slate-950" />
-            <span>DOWNLOAD SOURCE FILES (.ZIP)</span>
-          </button>
-        </div>
       </div>
     </div>
   );
