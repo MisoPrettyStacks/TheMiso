@@ -31,6 +31,11 @@ interface GlobalMapProps {
 }
 
 // Map Tile Layer Configurations — all free, no API key needed.
+/** Yesterday's date for NASA GIBS daily imagery (today's pass may not be processed yet). */
+function gibsDate(): string {
+  return new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+}
+
 const MAP_PROVIDERS = {
   tactical: {
     name: 'TACTICAL DARK',
@@ -45,6 +50,14 @@ const MAP_PROVIDERS = {
     subdomains: 'abc',
     attribution: 'Tiles &copy; Esri &mdash; Earthstar Geographics',
     maxZoom: 18
+  },
+  live: {
+    name: 'LIVE ORBITAL',
+    // NASA GIBS daily VIIRS true-color imagery — yesterday's actual satellite pass, free and keyless.
+    url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${gibsDate()}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+    subdomains: '',
+    attribution: 'Imagery &copy; NASA EOSDIS GIBS (daily VIIRS)',
+    maxZoom: 9
   },
   street: {
     name: 'STREET DETAIL',
@@ -126,7 +139,7 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
   const markersLayerGroup = useRef<L.LayerGroup | null>(null);
   const routesLayerGroup = useRef<L.LayerGroup | null>(null);
 
-  const [activeTileKey, setActiveTileKey] = useState<'tactical' | 'satellite' | 'street' | 'osm'>('tactical');
+  const [activeTileKey, setActiveTileKey] = useState<'tactical' | 'satellite' | 'live' | 'street' | 'osm'>('satellite');
   const [selectedTheater, setSelectedTheater] = useState<string>('GLOBAL');
   const [selectedLayer, setSelectedLayer] = useState<'ALL' | 'MINING' | 'DEFI' | 'SOVEREIGN' | 'MEV' | 'AI'>('ALL');
   // Live OSINT events — fetched from the backend, never static demo data.
@@ -175,7 +188,7 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
   });
 
   // Tile URL — all three providers are free and keyless.
-  const getTileUrl = (providerKey: 'tactical' | 'satellite' | 'street' | 'osm') => {
+  const getTileUrl = (providerKey: 'tactical' | 'satellite' | 'live' | 'street' | 'osm') => {
     return MAP_PROVIDERS[providerKey].url;
   };
 
@@ -469,7 +482,7 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
                 <Globe className="w-3.5 h-3.5 text-emerald-400" />
                 <span>MAP TILE:</span>
               </span>
-              {(['tactical', 'satellite', 'street', 'osm'] as const).map((key) => (
+              {(['satellite', 'live', 'tactical', 'street', 'osm'] as const).map((key) => (
                 <button
                   key={key}
                   onClick={() => {
