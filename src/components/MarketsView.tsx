@@ -7,6 +7,8 @@ import {
   Loader2,
   AlertTriangle,
   RefreshCw,
+  ChevronDown,
+  Bitcoin,
 } from 'lucide-react';
 import { directService, DirectCotRow, DirectYieldCurve } from '../services/directService';
 import { soundEffects } from '../services/soundEffects';
@@ -17,6 +19,30 @@ interface MarketsViewProps {
 
 // ── small helpers ───────────────────────────────────────────────────────────
 
+/** Expandable "Elaborate" explainer beneath a section subtitle. */
+function Elaborate({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-1">
+      <button
+        onClick={() => {
+          soundEffects.playTick();
+          setOpen((o) => !o);
+        }}
+        className="flex items-center space-x-1 text-[10px] font-mono text-cyan-500/80 hover:text-cyan-300 transition-colors"
+      >
+        <span className="underline underline-offset-2">Elaborate</span>
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <p className="mt-2 text-[11px] font-mono leading-relaxed text-slate-400 whitespace-pre-line">
+          {text}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Section({
   icon,
   title,
@@ -25,6 +51,8 @@ function Section({
   children,
   onRefresh,
   loading,
+  explainer,
+  updatedLabel,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -33,6 +61,8 @@ function Section({
   children: React.ReactNode;
   onRefresh?: () => void;
   loading?: boolean;
+  explainer?: string;
+  updatedLabel?: string;
 }) {
   return (
     <section className="rounded-xl bg-slate-900/70 border border-slate-800 overflow-hidden">
@@ -42,20 +72,26 @@ function Section({
           <div>
             <h3 className="text-xs font-mono font-bold text-slate-100 tracking-wider">{title}</h3>
             <p className="text-[10px] font-mono text-slate-500">{subtitle}</p>
+            {explainer && <Elaborate text={explainer} />}
           </div>
         </div>
-        {onRefresh && (
-          <button
-            onClick={() => {
-              soundEffects.playTick();
-              onRefresh();
-            }}
-            className="p-1.5 rounded border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 transition-colors"
-            title="Refresh section"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        )}
+        <div className="flex flex-col items-end gap-1">
+          {onRefresh && (
+            <button
+              onClick={() => {
+                soundEffects.playTick();
+                onRefresh();
+              }}
+              className="p-1.5 rounded border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 transition-colors"
+              title="Refresh section"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          )}
+          {updatedLabel && (
+            <span className="text-[9px] font-mono text-slate-600">updated {updatedLabel}</span>
+          )}
+        </div>
       </div>
       <div className="p-4">{children}</div>
     </section>
@@ -112,14 +148,42 @@ function DirectCotCard({ row }: { row: DirectCotRow }) {
   );
 }
 
+// ── section explainers ──────────────────────────────────────────────────────
+
+const BTC_COT_EXPLAINER = `CME Bitcoin futures COT — actual institutional BTC positioning. This is the CFTC's weekly Commitments of Traders report for CME Bitcoin futures specifically: not a proxy, not sentiment, but the real regulated futures positions held by institutional traders, broken into commercials (miners and merchants hedging actual BTC exposure), large speculators (hedge funds, CTAs), and small traders.
+
+WHAT IT TELLS YOU: where the institutional crowd stands. When large speculators are record-long BTC futures, everyone is already all-in — contrarian caution, because who's left to buy? When commercials (often miners locking in production) are heavily short, they're hedging into strength, which tends to happen near local tops. The week-over-week change in net positioning matters most: sharp flips by managed money have preceded major BTC legs in both directions.
+
+HOW IT RELATES TO CRYPTO: this IS crypto — the only CFTC-regulated window into institutional Bitcoin positioning. Spot BTC and CME futures are arbitraged tightly together, so futures positioning reflects the same institutional flows that move spot. Read it alongside the broader COT below: if specs are record-long both equities AND bitcoin futures, the entire risk complex is crowded on one side.`;
+
+const COT_EXPLAINER = `The Commitments of Traders report is published by the CFTC every Friday (data as of the prior Tuesday). It shows exactly how trader groups are positioned in futures markets — who's long, who's short, and how it changed week over week. Commercials are the hedgers (producers, merchants — often treated as "smart money"); non-commercials are large speculators, mostly hedge funds and CTAs; non-reportables are small traders, often the contrarian "dumb money" signal.
+
+WHAT IT TELLS YOU: where the crowded trades are. Record speculative longs mean everyone's already bought — tops form when there's nobody left to buy. Heavy commercial short hedging means producers are locking in prices, which also clusters near tops. Rising open interest with rising prices confirms a healthy trend; fading open interest means conviction is dying.
+
+HOW IT RELATES TO CRYPTO: crypto trades as high-beta risk — it amplifies whatever equities do. Record-long ES/NQ specs = institutional risk-on, and BTC/ETH typically move 2–3x the equity leg. Specs flipping long the dollar index (DX) is a headwind for everything priced in dollars. Panic-long crude on geopolitical shock = inflation fear = risk-off, and crypto sells with stocks. Gold positioning shows the hard-money rotation between gold and BTC.`;
+
+const YIELD_EXPLAINER = `The U.S. Treasury par yield curve — the price of money itself, direct from the Treasury, updated every business day. It plots what the U.S. government pays to borrow for 2, 5, 10, and 30 years.
+
+WHAT IT TELLS YOU: the curve's shape is the market's verdict on growth and inflation. A normal upward slope means investors demand more yield for longer commitments. When short rates rise above long rates (inversion — the 2s10s spread goes negative), it's the most reliable recession predictor in markets; every U.S. recession in 50 years was preceded by one.
+
+HOW IT RELATES TO CRYPTO: crypto is the longest-duration risk asset in existence — no cash flows to discount, so it lives and dies on liquidity. Falling long yields = cheaper money = risk-on = BTC rallies. A rapidly inverting curve means the Fed is tight and a slowdown is coming — that's when BTC drawdowns turn violent. Watch the 2s10s spread: when it snaps from deeply inverted back toward positive, liquidity is returning and crypto often bottoms there.`;
+
+const INSIDER_EXPLAINER = `Form 4 filings, direct from SEC EDGAR. When a company's officers, directors, or 10%+ owners buy or sell company stock, Section 16 requires disclosure on Form 4 within two business days. This tape shows those filings as they're published.
+
+WHAT IT TELLS YOU: insiders buy for one reason — they think the price is going up. They sell for many reasons (diversification, taxes, pre-planned 10b5-1 programs), so clustered BUYING, especially by CEOs and CFOs deploying real money, is the stronger signal. One sale means little; three executives buying in the same week means a lot.
+
+HOW IT RELATES TO CRYPTO: this tape tracks the publicly traded crypto complex — miners (MARA, CLSK), exchanges and brokers (COIN), BTC treasury companies (MSTR), and crypto-adjacent tech. When miners' executives buy their own stock into weakness, they're signaling confidence in operations and in the BTC price that drives them. When they're all selling into strength, take note.`;
+
 // ── main view ───────────────────────────────────────────────────────────────
 
 export const MarketsView: React.FC<MarketsViewProps> = () => {
   const [cot, setCot] = useState<DirectCotRow[]>([]);
+  const [btcCot, setBtcCot] = useState<DirectCotRow[]>([]);
   const [insiders, setInsiders] = useState<any[]>([]);
   const [yields, setYields] = useState<DirectYieldCurve | null>(null);
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [updated, setUpdated] = useState<Record<string, number>>({});
 
   const setL = (k: string, v: boolean) => setLoading((p) => ({ ...p, [k]: v }));
   const setE = (k: string, v: string | undefined) =>
@@ -129,6 +193,33 @@ export const MarketsView: React.FC<MarketsViewProps> = () => {
       else delete n[k];
       return n;
     });
+  const stamp = (k: string) => setUpdated((p) => ({ ...p, [k]: Date.now() }));
+
+  /** "3m ago" style label for a section's last successful refresh. */
+  const ago = (k: string) => {
+    const t = updated[k];
+    if (!t) return '';
+    const s = Math.floor((Date.now() - t) / 1000);
+    if (s < 60) return `${s}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    return `${Math.floor(m / 60)}h ago`;
+  };
+
+  // DIRECT: CME Bitcoin futures COT — institutional BTC positioning.
+  const loadBtcCot = async () => {
+    setL('btc', true);
+    setE('btc', undefined);
+    try {
+      const c = await directService.getCot('BTC');
+      setBtcCot(c.rows || []);
+      stamp('btc');
+    } catch (e: any) {
+      setE('btc', e.message);
+    } finally {
+      setL('btc', false);
+    }
+  };
 
   // DIRECT: CFTC Commitments of Traders — no key, no middleman.
   const loadCot = async () => {
@@ -137,6 +228,7 @@ export const MarketsView: React.FC<MarketsViewProps> = () => {
     try {
       const c = await directService.getCot();
       setCot(c.rows || []);
+      stamp('cot');
     } catch (e: any) {
       setE('cot', e.message);
     } finally {
@@ -150,6 +242,7 @@ export const MarketsView: React.FC<MarketsViewProps> = () => {
     setE('yld', undefined);
     try {
       setYields(await directService.getYields());
+      stamp('yld');
     } catch (e: any) {
       setE('yld', e.message);
     } finally {
@@ -164,6 +257,7 @@ export const MarketsView: React.FC<MarketsViewProps> = () => {
     try {
       const r = await directService.getInsiderBuys(12);
       setInsiders(r.rows || []);
+      stamp('ins');
     } catch (e: any) {
       setE('ins', e.message);
     } finally {
@@ -172,9 +266,18 @@ export const MarketsView: React.FC<MarketsViewProps> = () => {
   };
 
   useEffect(() => {
+    loadBtcCot();
     loadCot();
     loadYields();
     loadInsiders();
+    // Auto-refresh: the desk never goes stale. Filings move fastest (5m),
+    // yields update daily (15m check), COT is weekly (30m check).
+    const tIns = setInterval(loadInsiders, 5 * 60 * 1000);
+    const tYld = setInterval(loadYields, 15 * 60 * 1000);
+    const tCot = setInterval(() => { loadCot(); loadBtcCot(); }, 30 * 60 * 1000);
+    // Re-render the "updated Xs ago" labels every 30s.
+    const tAgo = setInterval(() => setUpdated((p) => ({ ...p })), 30 * 1000);
+    return () => { clearInterval(tIns); clearInterval(tYld); clearInterval(tCot); clearInterval(tAgo); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -191,7 +294,7 @@ export const MarketsView: React.FC<MarketsViewProps> = () => {
           <p className="text-xs sm:text-sm font-mono text-slate-400 mt-1">
             Positioning, yields, and insider tape — the market half of the situational picture — all come{' '}
             <span className="text-emerald-400 font-bold">DIRECT</span> from the CFTC, U.S. Treasury, and SEC.
-            No middleman, no key, no vault.
+            No middleman, no key, no vault. Sections auto-refresh on their own cadence — the desk never goes stale.
           </p>
         </div>
         <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg border text-xs font-mono font-bold border-emerald-700/60 bg-emerald-950/40 text-emerald-300">
@@ -208,6 +311,8 @@ export const MarketsView: React.FC<MarketsViewProps> = () => {
         accent="text-orange-400"
         onRefresh={loadYields}
         loading={loading.yld}
+        explainer={YIELD_EXPLAINER}
+        updatedLabel={ago('yld')}
       >
         {loading.yld && !yields ? (
           <LoadingRow label="Reading Treasury curve…" />
@@ -245,6 +350,37 @@ export const MarketsView: React.FC<MarketsViewProps> = () => {
         )}
       </Section>
 
+      {/* 1b — CME Bitcoin futures COT (ABOVE the broad COT) */}
+      <Section
+        icon={<Bitcoin className="w-4 h-4" />}
+        title="CME BITCOIN FUTURES COT"
+        subtitle="Actual institutional BTC positioning — direct from the CFTC, no key"
+        accent="text-amber-400"
+        onRefresh={loadBtcCot}
+        loading={loading.btc}
+        explainer={BTC_COT_EXPLAINER}
+        updatedLabel={ago('btc')}
+      >
+        {loading.btc && btcCot.length === 0 ? (
+          <LoadingRow label="Reading CME Bitcoin positioning…" />
+        ) : errors.btc ? (
+          <div className="flex items-center space-x-2 text-amber-400 text-xs font-mono py-4 justify-center">
+            <AlertTriangle className="w-4 h-4" />
+            <span>{errors.btc}</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {btcCot.map((c) => (
+              <DirectCotCard key={c.symbol} row={c} />
+            ))}
+            {btcCot.length === 0 && <EmptyRow label="No BTC COT rows" />}
+          </div>
+        )}
+        <div className="mt-3 text-[10px] font-mono text-slate-600">
+          Source: CFTC Commitments of Traders, CME Bitcoin futures (cftc.gov) · <span className="text-emerald-400 font-bold">DIRECT</span> · updated weekly
+        </div>
+      </Section>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 2 — COT positioning */}
         <Section
@@ -254,6 +390,8 @@ export const MarketsView: React.FC<MarketsViewProps> = () => {
           accent="text-cyan-400"
           onRefresh={loadCot}
           loading={loading.cot}
+          explainer={COT_EXPLAINER}
+          updatedLabel={ago('cot')}
         >
           {loading.cot && cot.length === 0 ? (
             <LoadingRow label="Reading CFTC positioning…" />
@@ -283,6 +421,8 @@ export const MarketsView: React.FC<MarketsViewProps> = () => {
           accent="text-emerald-400"
           onRefresh={loadInsiders}
           loading={loading.ins}
+          explainer={INSIDER_EXPLAINER}
+          updatedLabel={ago('ins')}
         >
           {loading.ins && insiders.length === 0 ? (
             <LoadingRow label="Reading SEC filings…" />
@@ -316,6 +456,9 @@ export const MarketsView: React.FC<MarketsViewProps> = () => {
                       <div className="text-[10px] font-mono text-slate-600">{p.filed}</div>
                     </div>
                   </div>
+                  <p className="mt-1.5 text-[10px] font-mono leading-relaxed text-slate-500">
+                    Form {p.form} filed {p.filed}: {p.insider} disclosed a change in beneficial ownership of {p.issuer} ({p.ticker}) securities. Section 16 insiders must report within two business days — open-market buys are the stronger bullish signal; sales are often pre-planned.
+                  </p>
                 </a>
               ))}
             </div>

@@ -64,6 +64,7 @@ async function directFetch(url: string, ttlMs: number, headers: Record<string, s
  * the noncommercial split (used for equity index futures).
  */
 const COT_TARGETS: Array<{ symbol: string; label: string; match: RegExp; preferDisagg: boolean }> = [
+  { symbol: 'BTC', label: 'Bitcoin (CME futures)', match: /^"BITCOIN - CHICAGO MERCANTILE EXCHANGE"/i, preferDisagg: false },
   { symbol: 'ES', label: 'E-Mini S&P 500', match: /E-MINI S&P 500(?!.*CONSU)/i, preferDisagg: false },
   { symbol: 'NQ', label: 'E-Mini Nasdaq 100', match: /E-MINI NASDAQ/i, preferDisagg: false },
   { symbol: 'GC', label: 'Gold', match: /^"GOLD - COMMODITY EXCHANGE INC\.?"/i, preferDisagg: true },
