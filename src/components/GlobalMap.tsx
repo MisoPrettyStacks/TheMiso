@@ -139,7 +139,7 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
   const markersLayerGroup = useRef<L.LayerGroup | null>(null);
   const routesLayerGroup = useRef<L.LayerGroup | null>(null);
 
-  const [activeTileKey, setActiveTileKey] = useState<'tactical' | 'satellite' | 'live' | 'street' | 'osm'>('satellite');
+  const [activeTileKey, setActiveTileKey] = useState<'tactical' | 'satellite' | 'live' | 'street' | 'osm'>('live');
   const [selectedTheater, setSelectedTheater] = useState<string>('GLOBAL');
   const [selectedLayer, setSelectedLayer] = useState<'ALL' | 'MINING' | 'DEFI' | 'SOVEREIGN' | 'MEV' | 'AI'>('ALL');
   // Live OSINT events — fetched from the backend, never static demo data.
