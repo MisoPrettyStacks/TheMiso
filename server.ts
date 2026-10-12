@@ -297,6 +297,17 @@ app.post('/api/vault/test-key', async (req, res) => {
   }
 });
 
+// API: AI status diagnostic (no secrets exposed — only whether a server key is present)
+app.get('/api/ai-status', (_req, res) => {
+  res.json({
+    success: true,
+    serverKeyConfigured: !!process.env.GEMINI_API_KEY,
+    serverKeyPrefix: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.slice(0, 4) + '…' : null,
+    uptimeSec: Math.round(process.uptime()),
+    buildTime: process.env.RENDER_GIT_COMMIT || null,
+  });
+});
+
 // API: AI Intelligence Briefing
 app.post('/api/ai/briefing', async (req, res) => {
   try {
