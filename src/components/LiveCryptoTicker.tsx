@@ -154,12 +154,12 @@ const DEFAULT_PRICES: Record<string, CryptoPriceData> = {
 };
 
 const DEFAULT_MACRO: MacroMetrics = {
-  totalMarketCap: "$2.84T",
-  btcDominance: "57.8%",
-  ethBtcRatio: "0.0317",
-  tetherPeg: "0.9998",
-  hashrate: "685 EH/s",
-  defiTvl: "$114.8B",
+  totalMarketCap: "syncing…",
+  btcDominance: "syncing…",
+  ethBtcRatio: "syncing…",
+  tetherPeg: "syncing…",
+  hashrate: "syncing…",
+  defiTvl: "syncing…",
 };
 
 interface LiveCryptoTickerProps {
@@ -219,7 +219,15 @@ export const LiveCryptoTicker: React.FC<LiveCryptoTickerProps> = ({
             });
             return next;
           });
-          if (data.macro) setMacro(data.macro);
+          if (data.macro) setMacro((prev) => {
+            // Keep last good value when the API returns null (rate-limited source)
+            const next = { ...prev };
+            for (const k of Object.keys(data.macro) as Array<keyof typeof next>) {
+              const v = (data.macro as any)[k];
+              if (v != null && v !== '') (next as any)[k] = v;
+            }
+            return next;
+          });
           setLastSyncTime(new Date());
           updatedFromSource = true;
         }
