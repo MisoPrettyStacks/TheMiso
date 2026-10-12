@@ -1062,7 +1062,7 @@ app.get('/api/live/osint-feed', async (_req, res) => {
             timestamp: new Date().toISOString(),
             source: 'DefiLlama Core Price & TVL Oracle',
             sourceUrl: 'https://defillama.com',
-            rawTelemetry: `Aggregated On-Chain Swaps: BTC=$${btcPrice.toFixed(2)} | ETH=$${ethPrice.toFixed(2)} | SOL=$${solPrice.toFixed(2)}; Cross-chain confidence > 99.8%.`,
+            rawTelemetry: `Aggregated On-Chain Swaps: BTC=$${btcPrice.toFixed(2)} | ETH=$${ethPrice.toFixed(2)} | SOL=$${solPrice.toFixed(2)}.`,
             summary: `RAW ORACLE TELEMETRY: Real-time price composite across decentralized liquidity pools confirms spot clearing parameters. Arbitrage bands across Curve, Uniswap v3, and Raydium remain tight without critical oracle divergence.`,
             affectedTickers: ['BTC', 'ETH', 'SOL'],
             pipelineId: 2,
@@ -1128,8 +1128,18 @@ app.get('/api/live/osint-feed', async (_req, res) => {
               tickers = ['MKR', 'ENA', 'CRV'];
             }
 
+            // Stable ID from the article URL so refreshes dedupe instead of duplicating.
+            const stableId = (() => {
+              const s = link || title;
+              let h = 0;
+              for (let i = 0; i < s.length; i++) {
+                h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+              }
+              return `rss-${(h >>> 0).toString(36)}`;
+            })();
+
             return {
-              id: `rss-feed-${idx}-${Date.now().toString(36)}`,
+              id: stableId,
               title: title.replace(/&amp;/g, '&').replace(/&#8217;/g, "'").replace(/&#8220;/g, '"').replace(/&#8221;/g, '"'),
               category: cat,
               sourceType: 'SECONDARY' as const,
