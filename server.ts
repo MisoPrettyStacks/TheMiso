@@ -455,7 +455,14 @@ Provide an exhaustive institutional crypto trade dossier with:
 3. Explicit mathematics of forecasted crypto prices: write out the exact mathematical formulation, step-by-step price target calculation, and show how on-chain metrics weight the impact from the sequence.
 4. Historical precedents and on-chain correlation weights.
 
-Output strictly valid JSON with this schema:
+MATH CONSISTENCY RULES (violating these invalidates the dossier):
+- Step 1 of mathDerivation MUST state the live baseline price P_0 you used, copied exactly from the LIVE SPOT PRICES block above.
+- Show the actual arithmetic: e.g. "$83,680 x (1 + 0.139) = $95,311.52". Do NOT skip the multiplication.
+- If an asset is in the LONG list, its calculatedTargetPrice MUST be ABOVE its live baseline price. If SHORT, BELOW.
+- expectedReturnPct MUST equal (target - baseline) / baseline * 100, with the correct sign.
+- Never use a price from your training data. If you are unsure of a live price, say so instead of inventing one.
+
+Output strictly valid JSON with this schema (numbers only, no "e.g." placeholders):
 {
   "pipeline": "${pipelineName}",
   "calculatedTargetPrice": "e.g. 112500.00",
@@ -485,12 +492,54 @@ Output strictly valid JSON with this schema:
   "strategicExecutionWindow": "Optimal execution timeframe"
 }`;
 
+/**
+ * Validate an AI forecast's internal math consistency against live prices.
+ * Returns a warning string when the AI's direction contradicts its own target,
+ * or when its baseline diverges from the live price. Null when consistent.
+ */
+function validateForecastMath(
+  parsed: any,
+  livePrices: Record<string, number>
+): string | null {
+  try {
+    const targetRaw = String(parsed.calculatedTargetPrice || '').replace(/[$,]/g, '');
+    const target = parseFloat(targetRaw);
+    if (!target || target <= 0) return 'AI returned an unparseable target price.';
+    const longs: string[] = (parsed.affectedTickers?.long || []).map((t: any) => String(t.ticker || '').toUpperCase());
+    const shorts: string[] = (parsed.affectedTickers?.short || []).map((t: any) => String(t.ticker || '').toUpperCase());
+    // Check the primary crypto asset (BTC/ETH/SOL/XRP) for direction vs target consistency.
+    for (const sym of ['BTC', 'ETH', 'SOL', 'XRP']) {
+      const live = livePrices[sym];
+      if (!live) continue;
+      // Heuristic: if the target is within 30% of this asset's live price, it's likely that asset's target.
+      if (Math.abs(target - live) / live > 0.3) continue;
+      const isLong = longs.includes(sym);
+      const isShort = shorts.includes(sym);
+      if (isLong && target < live * 0.99) {
+        return `Inconsistent: ${sym} is marked LONG but the $${target.toLocaleString()} target sits below the live $${live.toLocaleString()} price.`;
+      }
+      if (isShort && target > live * 1.01) {
+        return `Inconsistent: ${sym} is marked SHORT but the $${target.toLocaleString()} target sits above the live $${live.toLocaleString()} price.`;
+      }
+      return null; // matched an asset and it's consistent
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
     const failoverResult = await executeFailoverAiCall(prompt, vaultKeys);
 
     if (failoverResult?.text) {
       try {
         const cleanedText = failoverResult.text.replace(/```json\s*|```\s*$/g, '').trim();
         const parsed = JSON.parse(cleanedText);
+        const mathWarning = validateForecastMath(parsed, livePrices);
+        if (mathWarning) {
+          console.warn('AI forecast failed math validation:', mathWarning);
+          parsed.consistencyWarning = mathWarning + ' Treat this dossier with skepticism.';
+        }
         return res.json({ success: true, source: failoverResult.source, forecast: parsed });
       } catch (parseErr) {
         console.warn('Failed to parse forecast JSON, proceeding to econometric fallback:', parseErr);

@@ -233,6 +233,11 @@ export const AIDossierModal: React.FC<AIDossierModalProps> = ({
                   <h2 className="text-xl font-bold text-slate-100 mt-2">
                     {data.pipeline}
                   </h2>
+                  {data.consistencyWarning && (
+                    <div className="mt-2 p-2.5 rounded-lg bg-rose-950/60 border border-rose-800/70 text-[11px] font-mono text-rose-300 leading-relaxed">
+                      ⚠ MATH CHECK FAILED: {data.consistencyWarning}
+                    </div>
+                  )}
                   <p className="text-[11px] text-slate-400 mt-0.5">
                     SQUEEZE MULTIPLIER: {shockMultiplier.toFixed(2)}x
                   </p>
