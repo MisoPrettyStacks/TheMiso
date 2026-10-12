@@ -11,16 +11,12 @@ import {
   Activity,
   Layers,
   Sparkles,
-  Download,
-  Loader2,
-  FileArchive,
-  CheckCircle2,
   Key,
   BarChart3
 } from 'lucide-react';
 import { soundEffects } from '../services/soundEffects';
-import { downloadProjectSourceFiles } from '../services/sourceDownloader';
 import { apiVaultService } from '../services/apiVaultService';
+import { api } from '../services/apiBase';
 
 interface NavbarProps {
   activeTab: 'map' | 'pipelines' | 'osint' | 'markets' | 'scenario' | 'countries';
@@ -38,9 +34,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenApiVault
 }) => {
   const [currentTime, setCurrentTime] = useState<string>('');
+  const [btcPrice, setBtcPrice] = useState<string>('');
   const [isMuted, setIsMuted] = useState<boolean>(soundEffects.getMuted());
-  const [isDownloadingSource, setIsDownloadingSource] = useState<boolean>(false);
-  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
   const [vaultSummary, setVaultSummary] = useState<{ configured: number; total: number }>(() => {
     const { configured, total } = apiVaultService.getTotalSlotsCount();
     return { configured, total };
@@ -66,6 +61,23 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => clearInterval(interval);
   }, []);
 
+  // Live BTC price for the telemetry bar — real data, refreshed every 2 minutes.
+  useEffect(() => {
+    let cancelled = false;
+    const fetchBtc = async () => {
+      try {
+        const res = await fetch(api('/api/live/prices'));
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        const p = data?.prices?.BTC?.price;
+        if (p > 0) setBtcPrice(`$${Number(p).toLocaleString('en-US', { maximumFractionDigits: 0 })}`);
+      } catch { /* telemetry bar stays blank rather than fake */ }
+    };
+    fetchBtc();
+    const t = setInterval(fetchBtc, 2 * 60 * 1000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
+
   const handleSoundToggle = () => {
     const muted = soundEffects.toggleMute();
     setIsMuted(muted);
@@ -79,27 +91,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     setActiveTab(tab);
   };
 
-  const handleDownloadSource = async () => {
-    soundEffects.playPipelineOpen();
-    setIsDownloadingSource(true);
-    setDownloadNotice('Packaging source code (.zip)...');
-
-    await downloadProjectSourceFiles((progress) => {
-      setDownloadNotice(progress.message);
-      if (progress.status === 'completed') {
-        soundEffects.playSonar();
-        setTimeout(() => {
-          setIsDownloadingSource(false);
-          setDownloadNotice(null);
-        }, 3000);
-      } else if (progress.status === 'error') {
-        setTimeout(() => {
-          setIsDownloadingSource(false);
-          setDownloadNotice(null);
-        }, 3000);
-      }
-    });
-  };
 
   return (
     <header className="border-b border-slate-800 bg-slate-950/90 backdrop-blur-md sticky top-0 z-50">
@@ -115,15 +106,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <span className="text-slate-600">|</span>
           <div className="flex items-center space-x-1.5">
-            <span className="px-1.5 py-0.5 rounded bg-red-950/80 border border-red-800/80 text-red-400 font-bold tracking-wider">
-              DEFCON 2
+            <span className="px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-800/80 text-amber-300 font-bold tracking-wider">
+              BTC {btcPrice || '···'}
             </span>
-            <span className="text-slate-300 hidden sm:inline">HIGH CRYPTO ASYMMETRY</span>
+            <span className="text-slate-300 hidden sm:inline">LIVE SPOT</span>
           </div>
           <span className="text-slate-600 hidden md:inline">|</span>
           <div className="hidden md:flex items-center space-x-2 text-slate-400">
             <Activity className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-            <span>AGGREGATED ON-CHAIN FEEDS: <strong className="text-slate-200">194 SOVEREIGN &amp; VALIDATOR NODES</strong></span>
+            <span>LIVE FEEDS: <strong className="text-slate-200">CFTC · TREASURY · SEC EDGAR · BINANCE · MEMPOOL</strong></span>
           </div>
         </div>
 
@@ -256,7 +247,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <ShieldAlert className="w-3.5 h-3.5" />
-            <span>190+ SOVEREIGN NODES</span>
+            <span>COUNTRY MATRIX</span>
           </button>
         </nav>
 
@@ -280,31 +271,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
-          {/* Download Source Files Button */}
-          <button
-            onClick={handleDownloadSource}
-            disabled={isDownloadingSource}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border font-mono text-xs font-semibold shadow-md transition-all hover:scale-105 ${
-              isDownloadingSource
-                ? 'bg-amber-950/60 border-amber-500/60 text-amber-300 cursor-wait'
-                : 'bg-emerald-950/50 hover:bg-emerald-900/70 border-emerald-600/70 hover:border-emerald-500 text-emerald-200'
-            }`}
-            title="Download complete project source code (.ZIP archive)"
-          >
-            {isDownloadingSource ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-                <span className="hidden sm:inline">PACKAGING ZIP...</span>
-              </>
-            ) : (
-              <>
-                <FileArchive className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="hidden sm:inline">DOWNLOAD SOURCE (.ZIP)</span>
-                <span className="sm:hidden font-bold">ZIP</span>
-              </>
-            )}
-          </button>
-
           {/* Action: Generate AI Sovereign Briefing */}
           <button
             onClick={() => {
@@ -321,15 +287,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Floating Download Notification Banner */}
-      {downloadNotice && (
-        <div className="bg-emerald-950/90 border-t border-b border-emerald-500/40 px-4 py-1.5 text-xs font-mono text-emerald-300 flex items-center justify-between animate-fadeIn">
-          <div className="flex items-center space-x-2">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            <span>{downloadNotice}</span>
-          </div>
-          <span className="text-[10px] text-emerald-400/80">ABEILLE-ARCHIVE-ENGINE</span>
-        </div>
-      )}
     </header>
   );
 };

@@ -38,7 +38,7 @@ export const CountryMonitor: React.FC<CountryMonitorProps> = ({ onSelectPipeline
       <div className="border-b border-slate-800 pb-6">
         <div className="flex items-center space-x-2 text-xs font-mono text-cyan-400 mb-1">
           <Globe2 className="w-4 h-4 text-cyan-400" />
-          <span className="font-bold tracking-wider">WORLDWIDE SOVEREIGN CRYPTO &amp; BLOCKCHAIN MATRIX // 194 NATIONS</span>
+          <span className="font-bold tracking-wider">WORLDWIDE SOVEREIGN CRYPTO &amp; BLOCKCHAIN MATRIX</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-bold font-mono text-slate-100">
           Sovereign Digital Asset &amp; Mining Vulnerability Matrix
