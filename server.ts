@@ -343,86 +343,110 @@ app.post('/api/ai/briefing', async (req, res) => {
       macroLine ? `Macro: ${macroLine}.` : '',
     ].filter(Boolean).join('\n');
 
-    // ── Per-tab live context for the 6-section report ──
-    // Market Structure: COT positioning (BTC + equities), Treasury yields, insider filings.
-    let marketsBlock = '';
-    try {
-      const [cotRows, yields, insiders] = await Promise.all([
-        directCot(['BTC', 'ES', 'NQ']).catch(() => []),
-        directYields().catch(() => null),
-        directInsiderBuys(5).catch(() => []),
-      ]);
-      const cotLines = cotRows.map((r: any) => {
-        const total = (r.long || 0) + (r.short || 0);
-        const net = total ? (((r.long - r.short) / total) * 100).toFixed(1) : '0';
-        return `${r.symbol} (${r.label}): noncommercial net ${Number(net) >= 0 ? '+' : ''}${net}% (L ${Math.round(r.long || 0).toLocaleString()} / S ${Math.round(r.short || 0).toLocaleString()}), as of ${r.date}`;
+    // ── Per-tab intelligence data pages (real data, no AI — appended after the briefing) ──
+    // Each tab contributes one standalone data page to the brief.
+    async function buildTabDataPages(): Promise<Array<{ tab: string; heading: string; body: string }>> {
+      const pages: Array<{ tab: string; heading: string; body: string }> = [];
+
+      // 1. Infra Map — 7 chokepoints
+      pages.push({
+        tab: 'Global Crypto Infra Map',
+        heading: 'Strategic Chokepoint Status',
+        body: STRATEGIC_CHOKEPOINTS.map((c: any) =>
+          `${c.name} — Flow: ${c.dailyFlow}. Status: ${c.status}. Primary threat: ${c.primaryThreat}.`
+        ).join('\n\n'),
       });
-      const yldLine = yields
-        ? `Treasury par yields ${yields.date}: 2Y ${yields.year2?.toFixed(2)}%, 10Y ${yields.year10?.toFixed(2)}%, 30Y ${yields.year30?.toFixed(2)}%`
-        : '';
-      const insLines = insiders.slice(0, 5).map((p: any) => `${p.insider} → ${p.ticker} (${p.issuer}), Form ${p.form} filed ${p.filed}`);
-      marketsBlock = [
-        'MARKET STRUCTURE TAB (live):',
-        cotLines.length ? `COT positioning — ${cotLines.join(' | ')}.` : '',
-        yldLine ? `${yldLine}.` : '',
-        insLines.length ? `Latest insider filings — ${insLines.join(' | ')}.` : '',
-      ].filter(Boolean).join('\n');
-    } catch { /* best-effort */ }
 
-    // Transmission Pipelines: all 15 with urgency + horizon.
-    const pipelinesBlock = [
-      'TRANSMISSION PIPELINES TAB (15 analytical frameworks):',
-      ...MACRO_PIPELINES.map((p: any) => `#${p.id} [${p.urgency}] ${p.title} — horizon ${p.horizon}`),
-    ].join('\n');
+      // 2. Transmission Pipelines — all 15
+      pages.push({
+        tab: 'Transmission Pipelines',
+        heading: 'Pipeline Roster & Posture',
+        body: MACRO_PIPELINES.map((p: any) =>
+          `#${p.id} [${p.urgency}] ${p.title} — horizon ${p.horizon}, squeeze window ${p.squeezeWindow || 'n/a'}`
+        ).join('\n'),
+      });
 
-    // Infra Map: the 7 strategic chokepoints.
-    const chokepointsBlock = [
-      'INFRA MAP TAB (7 monitored chokepoints):',
-      ...STRATEGIC_CHOKEPOINTS.map((c: any) => `${c.name}: ${c.dailyFlow}; status ${c.status}; threat: ${c.primaryThreat}`),
-    ].join('\n');
+      // 3. Market Structure — live COT, yields, insiders
+      try {
+        const [cotRows, yields, insiders] = await Promise.all([
+          directCot(['BTC', 'ES', 'NQ']).catch(() => []),
+          directYields().catch(() => null),
+          directInsiderBuys(8).catch(() => []),
+        ]);
+        const parts: string[] = [];
+        for (const r of cotRows) {
+          const total = (r.long || 0) + (r.short || 0);
+          const net = total ? (((r.long - r.short) / total) * 100).toFixed(1) : '0';
+          parts.push(`COT ${r.symbol} (${r.label}), ${r.date}: noncommercial net ${Number(net) >= 0 ? '+' : ''}${net}% — long ${Math.round(r.long || 0).toLocaleString()}, short ${Math.round(r.short || 0).toLocaleString()}, OI ${Math.round(r.openInterest || 0).toLocaleString()}.`);
+        }
+        if (yields) {
+          parts.push(`Treasury par yields ${yields.date}: 1Y ${yields.year1?.toFixed(2)}%, 2Y ${yields.year2?.toFixed(2)}%, 5Y ${yields.year5?.toFixed(2)}%, 10Y ${yields.year10?.toFixed(2)}%, 30Y ${yields.year30?.toFixed(2)}%.`);
+        }
+        for (const p of insiders.slice(0, 8)) {
+          parts.push(`Insider: ${p.insider} → ${p.ticker} (${p.issuer}), Form ${p.form} filed ${p.filed}.`);
+        }
+        pages.push({
+          tab: 'Market Structure',
+          heading: 'Positioning, Curve & Insider Tape',
+          body: parts.length ? parts.join('\n\n') : 'Live market-structure data temporarily unavailable.',
+        });
+      } catch {
+        pages.push({ tab: 'Market Structure', heading: 'Positioning, Curve & Insider Tape', body: 'Live data temporarily unavailable.' });
+      }
 
-    const tabContext = [marketsBlock, pipelinesBlock, chokepointsBlock].filter(Boolean).join('\n\n');
+      // 4. Live On-Chain OSINT — mempool + macro snapshot
+      const osintParts: string[] = [];
+      if (mempoolLine) osintParts.push(mempoolLine);
+      if (macroLine) osintParts.push(`Macro snapshot: ${macroLine}.`);
+      if (priceLines) osintParts.push(`Spot: ${priceLines}.`);
+      pages.push({
+        tab: 'Live On-Chain OSINT',
+        heading: 'Network Telemetry Snapshot',
+        body: osintParts.length ? osintParts.join('\n\n') : 'Telemetry temporarily unavailable.',
+      });
 
+      // 5. Country Matrix — sovereign posture note
+      pages.push({
+        tab: 'Country Matrix',
+        heading: 'Sovereign Posture',
+        body: 'Sovereign crypto posture is assessed per jurisdiction across regulatory stance, mining/energy policy, and reserve strategy. Live per-country telemetry feeds into the matrix on the Country Matrix tab.',
+      });
+
+      return pages;
+    }
+
+    // ── ORIGINAL LOCKED BRIEFING — single institutional briefing, unchanged format ──
     const prompt = `You are the Chief Quantitative Analyst of MISOCRYPTO, an elite institutional crypto, digital, and blockchain asset intelligence desk.
-Generate a comprehensive, institutional-grade digital asset intelligence briefing as a FULL MULTI-SECTION REPORT — one in-depth section for EACH of the six platform tabs below. Each section must be substantive (3-5 sentences minimum), grounded in the live data provided, and specific — no generic filler.
+Generate a comprehensive, institutional-grade digital asset intelligence briefing.
+Category focus: ${category || 'Crypto & On-Chain Macro Transmission Cascades'}.
+Region focus: ${focusRegion || 'Global Blockchain & Validator Networks'}.
 ${liveBlock}
 
-${tabContext}
-
-THE SIX TABS (write one in-depth "sections" entry per tab, in this order):
-1. "Global Crypto Infra Map" — assess the 7 chokepoints above: which face the most acute pressure right now given live conditions, and what breaks if they fail.
-2. "Transmission Pipelines" — which of the 15 pipelines are most actionable under current live market conditions; name specific pipeline numbers and why their horizons matter now.
-3. "Live On-Chain OSINT" — synthesize what the live on-chain telemetry (block height, fees, mempool) is actually saying about network health and congestion right now.
-4. "Market Structure" — interpret the live COT positioning, Treasury yields, and insider filings above: what is institutional money doing, what does the curve say about liquidity, and what are insiders signaling.
-5. "Crypto War-Room" — the single highest-conviction threat scenario given ALL the live data above; be specific about trigger, transmission, and timeline.
-6. "Country Matrix" — sovereign-level posture: which jurisdictions' regulatory or energy actions pose the greatest near-term risk or opportunity to crypto markets, grounded in current conditions.
-
 GROUNDING RULES (violating these invalidates the briefing):
-- Every price, hashrate figure, fee rate, yield, COT figure, and market-cap number MUST come from the LIVE data blocks above, copied exactly.
-- Any price target MUST show the arithmetic with the live baseline substituted. LONG targets sit ABOVE the live price; SHORT targets BELOW.
-- Do NOT invent specific figures. If a live figure is missing, say "live figure unavailable" instead of guessing.
+- Every price, hashrate figure, fee rate, and market-cap number MUST come from the LIVE MARKET DATA block above, copied exactly.
+- Any mathForecast price target MUST show the arithmetic with the live baseline substituted (e.g. "$83,680 x 1.139 = $95,311.52"). LONG targets sit ABOVE the live price; SHORT targets BELOW.
+- Do NOT invent specific figures (no made-up hashrate drops, fee spikes, or liquidation volumes). If a live figure is missing, say "live figure unavailable" instead of guessing.
 - The "timestamp" field MUST be exactly: ${nowIso}
 
-Format your response strictly as valid JSON with this structure:
+Format your response strictly as valid JSON with the following structure:
 {
   "title": "A tactical crypto briefing headline",
   "classification": "TOP SECRET // DIGITAL ASSET RISK DESK",
   "timestamp": "${nowIso}",
-  "situationOverview": "2-3 paragraph executive summary synthesizing ALL SIX sections below.",
-  "sections": [
-    { "tab": "Global Crypto Infra Map", "heading": "Section headline", "body": "In-depth analysis, 3-5+ sentences. May contain multiple paragraphs separated by \\n\\n." },
-    { "tab": "Transmission Pipelines", "heading": "...", "body": "..." },
-    { "tab": "Live On-Chain OSINT", "heading": "...", "body": "..." },
-    { "tab": "Market Structure", "heading": "...", "body": "..." },
-    { "tab": "Crypto War-Room", "heading": "...", "body": "..." },
-    { "tab": "Country Matrix", "heading": "...", "body": "..." }
+  "situationOverview": "Detailed 2-3 paragraph situational awareness summary analyzing mining grid curtailments, on-chain liquidity bottlenecks, staking yield dislocations, and digital asset mispricings.",
+  "criticalVulnerabilities": [
+    "3-4 specific high-impact on-chain, protocol, or mining vulnerabilities"
   ],
-  "criticalVulnerabilities": ["3-4 specific high-impact vulnerabilities grounded in live data"],
   "tacticalArbitrageOpportunities": [
-    { "pipeline": "Name", "direction": "LONG/SHORT tickers", "timeHorizon": "1-3 Weeks", "mathForecast": "Equation and target with live baseline arithmetic shown" }
+    {
+      "pipeline": "Name of transmission lag pipeline",
+      "direction": "LONG specific crypto tickers / SHORT specific crypto tickers",
+      "timeHorizon": "e.g. 1-3 Weeks",
+      "mathForecast": "Brief mathematical price forecast equation and target"
+    }
   ],
-  "defconStatus": "DEFCON status",
-  "analystNote": "Actionable closing guidance."
+  "defconStatus": "DEFCON status (e.g. DEFCON 2 // ELEVATED ON-CHAIN ASYMMETRY)",
+  "analystNote": "Actionable closing guidance for institutional crypto asset allocators."
 }`;
 
     const failoverResult = await executeFailoverAiCall(prompt, vaultKeys);
@@ -431,19 +455,15 @@ Format your response strictly as valid JSON with this structure:
       try {
         const cleanedText = failoverResult.text.replace(/```json\s*|```\s*$/g, '').trim();
         const parsed = JSON.parse(cleanedText);
-        // Append user-queued research pages as additional sections after the 6 locked ones.
-        if (Array.isArray(extraPages) && extraPages.length > 0) {
-          const base = Array.isArray(parsed.sections) ? parsed.sections : [];
-          const extras = extraPages
-            .filter((p: any) => p && (p.heading || p.body))
-            .map((p: any) => ({
-              tab: `Research: ${p.tab || 'Desk'}`,
-              heading: p.heading || p.query || 'Additional Research',
-              body: p.body || '',
-              query: p.query || '',
-            }));
-          parsed.sections = [...base, ...extras];
-        }
+        // Tab intelligence data pages — one per tab, real data, appended after the locked briefing.
+        const tabPages = await buildTabDataPages();
+        // User-queued research pages (from per-tab search) appended after tab pages.
+        const queued = Array.isArray(extraPages) ? extraPages.filter((p: any) => p && (p.heading || p.body)) : [];
+        parsed.dataPages = [...tabPages, ...queued.map((p: any) => ({
+          tab: `Research: ${p.tab || 'Desk'}`,
+          heading: p.heading || p.query || 'Additional Research',
+          body: p.body || '',
+        }))];
         return res.json({ success: true, source: failoverResult.source, briefing: parsed });
       } catch (parseErr) {
         console.warn('Failed to parse AI output, proceeding to econometric fallback:', parseErr);

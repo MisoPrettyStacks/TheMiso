@@ -121,10 +121,12 @@ export const AIDossierModal: React.FC<AIDossierModalProps> = ({
       lines.push(`Generated: ${data.timestamp || new Date().toISOString()}`);
       lines.push('');
       if (data.situationOverview) { lines.push('## Situational Awareness Summary'); lines.push(data.situationOverview); lines.push(''); }
-      if (Array.isArray(data.sections)) {
-        data.sections.forEach((sec: any) => {
-          lines.push(`## ${sec.tab || 'Section'} — ${sec.heading || ''}`);
-          lines.push(sec.body || '');
+      if (Array.isArray(data.dataPages)) {
+        data.dataPages.forEach((pg: any) => {
+          lines.push(`## ${pg.tab || 'Section'} — ${pg.heading || ''}`);
+          lines.push(pg.body || '');
+          lines.push('');
+          lines.push('---');
           lines.push('');
         });
       }
@@ -315,25 +317,25 @@ export const AIDossierModal: React.FC<AIDossierModalProps> = ({
                   </p>
                 </div>
 
-                {/* Per-tab in-depth sections */}
-                {Array.isArray(data.sections) && data.sections.length > 0 && (
+                {/* Per-tab intelligence data pages — one standalone page per tab */}
+                {Array.isArray(data.dataPages) && data.dataPages.length > 0 && (
                   <div className="space-y-4">
                     <h4 className="text-amber-400 font-bold uppercase tracking-wider">
-                      Full Desk Report — By Section:
+                      Tab Intelligence — Individual Pages:
                     </h4>
-                    {data.sections.map((sec: any, i: number) => (
-                      <div key={i} className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                    {data.dataPages.map((pg: any, i: number) => (
+                      <div key={i} className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2 break-inside-avoid">
                         <div className="flex items-center space-x-2">
-                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-300 uppercase tracking-wider">
-                            {sec.tab}
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-950 border border-amber-800 text-amber-300 uppercase tracking-wider">
+                            {pg.tab}
                           </span>
                         </div>
-                        {sec.heading && (
-                          <h5 className="text-slate-100 font-bold">{sec.heading}</h5>
+                        {pg.heading && (
+                          <h5 className="text-slate-100 font-bold">{pg.heading}</h5>
                         )}
-                        <div className="space-y-2">
-                          {String(sec.body || '').split(/\n\n+/).map((para: string, j: number) => (
-                            <p key={j} className="text-slate-300 leading-relaxed text-[12px]">{para}</p>
+                        <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                          {String(pg.body || '').split(/\n\n+/).map((para: string, j: number) => (
+                            <p key={j} className="text-slate-300 leading-relaxed text-[12px] whitespace-pre-wrap">{para}</p>
                           ))}
                         </div>
                       </div>
