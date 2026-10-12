@@ -6,6 +6,8 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import JSZip from 'jszip';
 import { directCot, directYields, directInsiderBuys, directStockHistory } from './server/direct';
+import { MACRO_PIPELINES } from './src/data/pipelinesData';
+import { STRATEGIC_CHOKEPOINTS } from './src/data/osintEvents';
 
 dotenv.config();
 
@@ -341,37 +343,86 @@ app.post('/api/ai/briefing', async (req, res) => {
       macroLine ? `Macro: ${macroLine}.` : '',
     ].filter(Boolean).join('\n');
 
+    // ── Per-tab live context for the 6-section report ──
+    // Market Structure: COT positioning (BTC + equities), Treasury yields, insider filings.
+    let marketsBlock = '';
+    try {
+      const [cotRows, yields, insiders] = await Promise.all([
+        directCot(['BTC', 'ES', 'NQ']).catch(() => []),
+        directYields().catch(() => null),
+        directInsiderBuys(5).catch(() => []),
+      ]);
+      const cotLines = cotRows.map((r: any) => {
+        const total = (r.long || 0) + (r.short || 0);
+        const net = total ? (((r.long - r.short) / total) * 100).toFixed(1) : '0';
+        return `${r.symbol} (${r.label}): noncommercial net ${Number(net) >= 0 ? '+' : ''}${net}% (L ${Math.round(r.long || 0).toLocaleString()} / S ${Math.round(r.short || 0).toLocaleString()}), as of ${r.date}`;
+      });
+      const yldLine = yields
+        ? `Treasury par yields ${yields.date}: 2Y ${yields.year2?.toFixed(2)}%, 10Y ${yields.year10?.toFixed(2)}%, 30Y ${yields.year30?.toFixed(2)}%`
+        : '';
+      const insLines = insiders.slice(0, 5).map((p: any) => `${p.insider} → ${p.ticker} (${p.issuer}), Form ${p.form} filed ${p.filed}`);
+      marketsBlock = [
+        'MARKET STRUCTURE TAB (live):',
+        cotLines.length ? `COT positioning — ${cotLines.join(' | ')}.` : '',
+        yldLine ? `${yldLine}.` : '',
+        insLines.length ? `Latest insider filings — ${insLines.join(' | ')}.` : '',
+      ].filter(Boolean).join('\n');
+    } catch { /* best-effort */ }
+
+    // Transmission Pipelines: all 15 with urgency + horizon.
+    const pipelinesBlock = [
+      'TRANSMISSION PIPELINES TAB (15 analytical frameworks):',
+      ...MACRO_PIPELINES.map((p: any) => `#${p.id} [${p.urgency}] ${p.title} — horizon ${p.horizon}`),
+    ].join('\n');
+
+    // Infra Map: the 7 strategic chokepoints.
+    const chokepointsBlock = [
+      'INFRA MAP TAB (7 monitored chokepoints):',
+      ...STRATEGIC_CHOKEPOINTS.map((c: any) => `${c.name}: ${c.dailyFlow}; status ${c.status}; threat: ${c.primaryThreat}`),
+    ].join('\n');
+
+    const tabContext = [marketsBlock, pipelinesBlock, chokepointsBlock].filter(Boolean).join('\n\n');
+
     const prompt = `You are the Chief Quantitative Analyst of MISOCRYPTO, an elite institutional crypto, digital, and blockchain asset intelligence desk.
-Generate a comprehensive, institutional-grade digital asset intelligence briefing.
-Category focus: ${category || 'Crypto & On-Chain Macro Transmission Cascades'}.
-Region focus: ${focusRegion || 'Global Blockchain & Validator Networks'}.
+Generate a comprehensive, institutional-grade digital asset intelligence briefing as a FULL MULTI-SECTION REPORT — one in-depth section for EACH of the six platform tabs below. Each section must be substantive (3-5 sentences minimum), grounded in the live data provided, and specific — no generic filler.
 ${liveBlock}
 
+${tabContext}
+
+THE SIX TABS (write one in-depth "sections" entry per tab, in this order):
+1. "Global Crypto Infra Map" — assess the 7 chokepoints above: which face the most acute pressure right now given live conditions, and what breaks if they fail.
+2. "Transmission Pipelines" — which of the 15 pipelines are most actionable under current live market conditions; name specific pipeline numbers and why their horizons matter now.
+3. "Live On-Chain OSINT" — synthesize what the live on-chain telemetry (block height, fees, mempool) is actually saying about network health and congestion right now.
+4. "Market Structure" — interpret the live COT positioning, Treasury yields, and insider filings above: what is institutional money doing, what does the curve say about liquidity, and what are insiders signaling.
+5. "Crypto War-Room" — the single highest-conviction threat scenario given ALL the live data above; be specific about trigger, transmission, and timeline.
+6. "Country Matrix" — sovereign-level posture: which jurisdictions' regulatory or energy actions pose the greatest near-term risk or opportunity to crypto markets, grounded in current conditions.
+
 GROUNDING RULES (violating these invalidates the briefing):
-- Every price, hashrate figure, fee rate, and market-cap number MUST come from the LIVE MARKET DATA block above, copied exactly.
-- Any mathForecast price target MUST show the arithmetic with the live baseline substituted (e.g. "$83,680 x 1.139 = $95,311.52"). LONG targets sit ABOVE the live price; SHORT targets BELOW.
-- Do NOT invent specific figures (no made-up hashrate drops, fee spikes, or liquidation volumes). If a live figure is missing, say "live figure unavailable" instead of guessing.
+- Every price, hashrate figure, fee rate, yield, COT figure, and market-cap number MUST come from the LIVE data blocks above, copied exactly.
+- Any price target MUST show the arithmetic with the live baseline substituted. LONG targets sit ABOVE the live price; SHORT targets BELOW.
+- Do NOT invent specific figures. If a live figure is missing, say "live figure unavailable" instead of guessing.
 - The "timestamp" field MUST be exactly: ${nowIso}
 
-Format your response strictly as valid JSON with the following structure:
+Format your response strictly as valid JSON with this structure:
 {
   "title": "A tactical crypto briefing headline",
   "classification": "TOP SECRET // DIGITAL ASSET RISK DESK",
-  "timestamp": "${new Date().toISOString()}",
-  "situationOverview": "Detailed 2-3 paragraph situational awareness summary analyzing mining grid curtailments, on-chain liquidity bottlenecks, staking yield dislocations, and digital asset mispricings.",
-  "criticalVulnerabilities": [
-    "3-4 specific high-impact on-chain, protocol, or mining vulnerabilities"
+  "timestamp": "${nowIso}",
+  "situationOverview": "2-3 paragraph executive summary synthesizing ALL SIX sections below.",
+  "sections": [
+    { "tab": "Global Crypto Infra Map", "heading": "Section headline", "body": "In-depth analysis, 3-5+ sentences. May contain multiple paragraphs separated by \\n\\n." },
+    { "tab": "Transmission Pipelines", "heading": "...", "body": "..." },
+    { "tab": "Live On-Chain OSINT", "heading": "...", "body": "..." },
+    { "tab": "Market Structure", "heading": "...", "body": "..." },
+    { "tab": "Crypto War-Room", "heading": "...", "body": "..." },
+    { "tab": "Country Matrix", "heading": "...", "body": "..." }
   ],
+  "criticalVulnerabilities": ["3-4 specific high-impact vulnerabilities grounded in live data"],
   "tacticalArbitrageOpportunities": [
-    {
-      "pipeline": "Name of transmission lag pipeline",
-      "direction": "LONG specific crypto tickers / SHORT specific crypto tickers",
-      "timeHorizon": "e.g. 1-3 Weeks",
-      "mathForecast": "Brief mathematical price forecast equation and target"
-    }
+    { "pipeline": "Name", "direction": "LONG/SHORT tickers", "timeHorizon": "1-3 Weeks", "mathForecast": "Equation and target with live baseline arithmetic shown" }
   ],
-  "defconStatus": "DEFCON status (e.g. DEFCON 2 // ELEVATED ON-CHAIN ASYMMETRY)",
-  "analystNote": "Actionable closing guidance for institutional crypto asset allocators."
+  "defconStatus": "DEFCON status",
+  "analystNote": "Actionable closing guidance."
 }`;
 
     const failoverResult = await executeFailoverAiCall(prompt, vaultKeys);

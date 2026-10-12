@@ -113,6 +113,13 @@ export const AIDossierModal: React.FC<AIDossierModalProps> = ({
       lines.push(`Generated: ${data.timestamp || new Date().toISOString()}`);
       lines.push('');
       if (data.situationOverview) { lines.push('## Situational Awareness Summary'); lines.push(data.situationOverview); lines.push(''); }
+      if (Array.isArray(data.sections)) {
+        data.sections.forEach((sec: any) => {
+          lines.push(`## ${sec.tab || 'Section'} — ${sec.heading || ''}`);
+          lines.push(sec.body || '');
+          lines.push('');
+        });
+      }
       if (data.criticalVulnerabilities?.length) { lines.push('## Critical Vulnerabilities'); data.criticalVulnerabilities.forEach((v: string) => lines.push(`- ${v}`)); lines.push(''); }
       if (data.tacticalArbitrageOpportunities?.length) {
         lines.push('## Tactical Arbitrage Opportunities');
@@ -274,6 +281,32 @@ export const AIDossierModal: React.FC<AIDossierModalProps> = ({
                     {data.situationOverview}
                   </p>
                 </div>
+
+                {/* Per-tab in-depth sections */}
+                {Array.isArray(data.sections) && data.sections.length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="text-amber-400 font-bold uppercase tracking-wider">
+                      Full Desk Report — By Section:
+                    </h4>
+                    {data.sections.map((sec: any, i: number) => (
+                      <div key={i} className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-300 uppercase tracking-wider">
+                            {sec.tab}
+                          </span>
+                        </div>
+                        {sec.heading && (
+                          <h5 className="text-slate-100 font-bold">{sec.heading}</h5>
+                        )}
+                        <div className="space-y-2">
+                          {String(sec.body || '').split(/\n\n+/).map((para: string, j: number) => (
+                            <p key={j} className="text-slate-300 leading-relaxed text-[12px]">{para}</p>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Critical Vulnerabilities */}
                 <div className="space-y-2">
