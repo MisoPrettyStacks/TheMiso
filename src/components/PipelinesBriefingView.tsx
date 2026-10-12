@@ -19,6 +19,7 @@ import {
   Share2
 } from 'lucide-react';
 import { MACRO_PIPELINES, PIPELINE_CATEGORIES, PipelineItem } from '../data/pipelinesData';
+import { TabSearchSection } from './TabSearchSection';
 import { soundEffects } from '../services/soundEffects';
 
 /**
@@ -54,11 +55,13 @@ function fmtReviewDate(iso: string): string {
 interface PipelinesBriefingViewProps {
   onOpenPipelineModal: (pipeline: PipelineItem, shockMultiplier: number) => void;
   selectedPipelineId?: number | null;
+  onPageAdded?: (page: { tab: string; query: string; heading: string; body: string }) => void;
 }
 
 export const PipelinesBriefingView: React.FC<PipelinesBriefingViewProps> = ({
   onOpenPipelineModal,
-  selectedPipelineId
+  selectedPipelineId,
+  onPageAdded
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
@@ -94,6 +97,11 @@ export const PipelinesBriefingView: React.FC<PipelinesBriefingViewProps> = ({
 
   return (
     <div className="min-h-screen bg-[#070a0f] text-slate-200 pb-20">
+      {onPageAdded && (
+        <div className="max-w-6xl mx-auto px-4 sm:px-8 pt-6">
+          <TabSearchSection tab="Transmission Pipelines" onPageAdded={onPageAdded} />
+        </div>
+      )}
       {/* Official Dossier Document Header */}
       <div className="border-b border-slate-800 bg-gradient-to-b from-slate-900 to-slate-950 px-4 py-8 sm:px-8">
         <div className="max-w-6xl mx-auto">

@@ -27,6 +27,10 @@ interface AIDossierModalProps {
   mode: 'BRIEFING' | 'PIPELINE_FORECAST';
   pipeline?: PipelineItem | null;
   shockMultiplier?: number;
+  /** Queued deep-research pages appended to the briefing as extra sections */
+  extraPages?: Array<{ tab: string; query: string; heading: string; body: string }>;
+  onRemoveExtraPage?: (idx: number) => void;
+  onClearExtraPages?: () => void;
 }
 
 export const AIDossierModal: React.FC<AIDossierModalProps> = ({
@@ -35,6 +39,9 @@ export const AIDossierModal: React.FC<AIDossierModalProps> = ({
   mode,
   pipeline,
   shockMultiplier = 1.0,
+  extraPages = [],
+  onRemoveExtraPage,
+  onClearExtraPages,
 }) => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
@@ -58,7 +65,8 @@ export const AIDossierModal: React.FC<AIDossierModalProps> = ({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
               category: 'Macro Transmission Squeezes',
-              vaultKeys
+              vaultKeys,
+              extraPages,
             }),
           });
           if (res.ok) {
@@ -92,7 +100,7 @@ export const AIDossierModal: React.FC<AIDossierModalProps> = ({
     };
 
     fetchData();
-  }, [isOpen, mode, pipeline, shockMultiplier]);
+  }, [isOpen, mode, pipeline, shockMultiplier, extraPages]);
 
   if (!isOpen) return null;
 
@@ -249,6 +257,31 @@ export const AIDossierModal: React.FC<AIDossierModalProps> = ({
 
         {/* Modal Content Body */}
         <div className="p-6 overflow-y-auto space-y-6 font-mono text-xs text-slate-300">
+          {/* Queued research pages */}
+          {mode === 'BRIEFING' && extraPages.length > 0 && (
+            <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-800/60 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider">
+                  +{extraPages.length} research page{extraPages.length > 1 ? 's' : ''} queued for this brief
+                </span>
+                {onClearExtraPages && (
+                  <button onClick={onClearExtraPages} className="text-[10px] text-slate-500 hover:text-red-400 underline">
+                    clear all
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {extraPages.map((p, i) => (
+                  <span key={i} className="inline-flex items-center space-x-1 px-2 py-1 rounded bg-slate-900 border border-cyan-800 text-[10px] text-cyan-200">
+                    <span className="max-w-[220px] truncate" title={`${p.tab}: ${p.query}`}>{p.tab}: {p.query}</span>
+                    {onRemoveExtraPage && (
+                      <button onClick={() => onRemoveExtraPage(i)} className="text-slate-500 hover:text-red-400 font-bold">×</button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center space-y-4 text-center">
               <Sparkles className="w-8 h-8 text-cyan-400 animate-spin" />

@@ -12,9 +12,10 @@ import {
 } from 'lucide-react';
 import { directService, DirectCotRow, DirectYieldCurve } from '../services/directService';
 import { soundEffects } from '../services/soundEffects';
+import { TabSearchSection } from './TabSearchSection';
 
 interface MarketsViewProps {
-  // no props — all data loads direct from primary sources, no key vault needed
+  onPageAdded?: (page: { tab: string; query: string; heading: string; body: string }) => void;
 }
 
 // ── small helpers ───────────────────────────────────────────────────────────
@@ -176,7 +177,7 @@ HOW IT RELATES TO CRYPTO: this tape tracks the publicly traded crypto complex �
 
 // ── main view ───────────────────────────────────────────────────────────────
 
-export const MarketsView: React.FC<MarketsViewProps> = () => {
+export const MarketsView: React.FC<MarketsViewProps> = ({ onPageAdded }) => {
   const [cot, setCot] = useState<DirectCotRow[]>([]);
   const [btcCot, setBtcCot] = useState<DirectCotRow[]>([]);
   const [insiders, setInsiders] = useState<any[]>([]);
@@ -283,6 +284,11 @@ export const MarketsView: React.FC<MarketsViewProps> = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 text-slate-200 space-y-6">
+      {onPageAdded && (
+        <div className="px-4 sm:px-6 pt-4">
+          <TabSearchSection tab="Market Structure" onPageAdded={onPageAdded} />
+        </div>
+      )}
       {/* Header */}
       <div className="border-b border-slate-800 pb-6 flex flex-wrap items-start justify-between gap-4">
         <div>

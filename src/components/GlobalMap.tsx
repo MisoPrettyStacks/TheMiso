@@ -22,12 +22,14 @@ import {
   Info
 } from 'lucide-react';
 import { STRATEGIC_CHOKEPOINTS, OsintEvent } from '../data/osintEvents';
+import { TabSearchSection } from './TabSearchSection';
 import { api } from '../services/apiBase';
 import { soundEffects } from '../services/soundEffects';
 
 interface GlobalMapProps {
   onSelectPipeline: (pipelineId: number) => void;
   onOpenApiVault?: () => void;
+  onPageAdded?: (page: { tab: string; query: string; heading: string; body: string }) => void;
 }
 
 // Map Tile Layer Configurations — all free, no API key needed.
@@ -132,7 +134,7 @@ const CRYPTO_DATA_CONDUITS: { name: string; color: string; coords: [number, numb
   }
 ];
 
-export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
+export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline, onPageAdded }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
@@ -609,6 +611,11 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ onSelectPipeline }) => {
 
       {/* Right Sidebar: Strategic Intelligence Dossier */}
       <div className="w-full xl:w-96 bg-slate-900/95 backdrop-blur-md flex flex-col justify-between overflow-y-auto border-t xl:border-t-0 border-slate-800 shadow-2xl z-20">
+        {onPageAdded && (
+          <div className="p-4 pb-0">
+            <TabSearchSection tab="Global Crypto Infra Map" onPageAdded={onPageAdded} />
+          </div>
+        )}
         {activeItem ? (
           <div className="p-5 space-y-5">
             {/* Header info */}

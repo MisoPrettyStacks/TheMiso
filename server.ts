@@ -300,7 +300,7 @@ app.post('/api/vault/test-key', async (req, res) => {
 // API: AI Intelligence Briefing
 app.post('/api/ai/briefing', async (req, res) => {
   try {
-    const { category, focusRegion, vaultKeys } = req.body;
+    const { category, focusRegion, vaultKeys, extraPages } = req.body;
 
     if (aiUnavailable(vaultKeys)) {
       return res.status(503).json(AI_NOT_CONFIGURED);
@@ -431,6 +431,19 @@ Format your response strictly as valid JSON with this structure:
       try {
         const cleanedText = failoverResult.text.replace(/```json\s*|```\s*$/g, '').trim();
         const parsed = JSON.parse(cleanedText);
+        // Append user-queued research pages as additional sections after the 6 locked ones.
+        if (Array.isArray(extraPages) && extraPages.length > 0) {
+          const base = Array.isArray(parsed.sections) ? parsed.sections : [];
+          const extras = extraPages
+            .filter((p: any) => p && (p.heading || p.body))
+            .map((p: any) => ({
+              tab: `Research: ${p.tab || 'Desk'}`,
+              heading: p.heading || p.query || 'Additional Research',
+              body: p.body || '',
+              query: p.query || '',
+            }));
+          parsed.sections = [...base, ...extras];
+        }
         return res.json({ success: true, source: failoverResult.source, briefing: parsed });
       } catch (parseErr) {
         console.warn('Failed to parse AI output, proceeding to econometric fallback:', parseErr);
@@ -685,6 +698,111 @@ function validateForecastMath(
       success: false,
       error: error.message || 'Failed to compute forecast',
     });
+  }
+});
+
+// API: Per-tab deep search — generates an in-depth research page for a tab + query,
+// which the frontend queues as an additional page in the AI brief.
+app.post('/api/ai/search-page', async (req, res) => {
+  try {
+    const { tab, query, vaultKeys } = req.body;
+    if (!query || !String(query).trim()) {
+      return res.status(400).json({ success: false, error: 'Search query required.' });
+    }
+    if (aiUnavailable(vaultKeys)) {
+      return res.status(503).json(AI_NOT_CONFIGURED);
+    }
+
+    const q = String(query).trim();
+    const nowIso = new Date().toISOString();
+
+    // Live baseline (shared grounding)
+    const livePrices = await getLiveSpotPrices();
+    const priceLines = Object.entries(livePrices)
+      .map(([k, v]) => `${k}: $${v.toLocaleString('en-US', { maximumFractionDigits: 2 })}`)
+      .join(', ');
+    const priceMap: Record<string, { price: number }> = {};
+    for (const [k, v] of Object.entries(livePrices)) priceMap[k] = { price: v };
+    const macro = await getLiveMacro(priceMap);
+    const macroLine = [
+      macro.totalMarketCap && `total crypto mcap ${macro.totalMarketCap}`,
+      macro.btcDominance && `BTC dominance ${macro.btcDominance}`,
+      macro.hashrate && `BTC hashrate ${macro.hashrate}`,
+      macro.defiTvl && `DeFi TVL ${macro.defiTvl}`,
+      macro.tetherPeg && `USDT peg ${macro.tetherPeg}`,
+    ].filter(Boolean).join(' · ');
+
+    // Tab-specific context
+    let tabContext = '';
+    const tabKey = String(tab || '').toLowerCase();
+    if (tabKey.includes('map') || tabKey.includes('infra')) {
+      tabContext = ['INFRA MAP — 7 strategic chokepoints:',
+        ...STRATEGIC_CHOKEPOINTS.map((c: any) => `${c.name}: ${c.dailyFlow}; status ${c.status}; threat: ${c.primaryThreat}`),
+      ].join('\n');
+    } else if (tabKey.includes('pipeline') || tabKey.includes('math')) {
+      tabContext = ['TRANSMISSION PIPELINES — 15 frameworks:',
+        ...MACRO_PIPELINES.map((p: any) => `#${p.id} [${p.urgency}] ${p.title} — horizon ${p.horizon}. Thesis: ${p.coreThesis || p.thesis || ''}`),
+      ].join('\n');
+    } else if (tabKey.includes('market')) {
+      try {
+        const [cotRows, yields, insiders] = await Promise.all([
+          directCot(['BTC', 'ES', 'NQ']).catch(() => []),
+          directYields().catch(() => null),
+          directInsiderBuys(8).catch(() => []),
+        ]);
+        tabContext = [
+          'MARKET STRUCTURE — live:',
+          ...cotRows.map((r: any) => `COT ${r.symbol} (${r.label}): NC L ${Math.round(r.long || 0).toLocaleString()} / S ${Math.round(r.short || 0).toLocaleString()}, ${r.date}`),
+          yields ? `Treasury ${yields.date}: 2Y ${yields.year2?.toFixed(2)}%, 10Y ${yields.year10?.toFixed(2)}%, 30Y ${yields.year30?.toFixed(2)}%` : '',
+          ...insiders.slice(0, 8).map((p: any) => `Insider: ${p.insider} → ${p.ticker}, Form ${p.form} filed ${p.filed}`),
+        ].filter(Boolean).join('\n');
+      } catch { tabContext = 'MARKET STRUCTURE — live data temporarily unavailable.'; }
+    } else if (tabKey.includes('countr')) {
+      tabContext = 'COUNTRY MATRIX — sovereign crypto posture: assess regulatory stance, mining policy, CBDC posture, and reserve strategy per jurisdiction relevant to the query.';
+    } else {
+      tabContext = 'LIVE ON-CHAIN OSINT — real-time feed of primary filings, RPC telemetry, and wire dispatches.';
+    }
+
+    const prompt = `You are the Chief Quantitative Analyst of MISOCRYPTO, an elite institutional crypto intelligence desk.
+Write ONE in-depth research page for the desk's AI brief.
+
+TAB: ${tab}
+RESEARCH QUERY: "${q}"
+Generated: ${nowIso}
+
+LIVE BASELINE (ground every number in these — never training data):
+${priceLines ? `Spot: ${priceLines}.` : ''}
+${macroLine ? `Macro: ${macroLine}.` : ''}
+
+TAB CONTEXT:
+${tabContext}
+
+GROUNDING RULES:
+- Answer the query directly and in depth (4-6+ sentences, may use multiple paragraphs separated by \\n\\n).
+- Every price/stat must come from the LIVE BASELINE or TAB CONTEXT above. If a figure is unavailable, say "live figure unavailable" — never invent.
+- Be specific: name tickers, pipelines, chokepoints, or filings where relevant. No generic filler.
+
+Respond strictly as valid JSON:
+{
+  "tab": "${tab}",
+  "query": ${JSON.stringify(q)},
+  "heading": "Page headline",
+  "body": "In-depth research page, 4-6+ sentences. Paragraphs separated by \\n\\n."
+}`;
+
+    const failoverResult = await executeFailoverAiCall(prompt, vaultKeys);
+    if (failoverResult?.text) {
+      try {
+        const cleanedText = failoverResult.text.replace(/```json\s*|```\s*$/g, '').trim();
+        const parsed = JSON.parse(cleanedText);
+        return res.json({ success: true, source: failoverResult.source, page: parsed });
+      } catch (parseErr) {
+        return res.status(500).json({ success: false, error: 'AI returned malformed research page.' });
+      }
+    }
+    return res.status(500).json({ success: false, error: 'All AI providers failed for research page.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Search page failed.' });
   }
 });
 

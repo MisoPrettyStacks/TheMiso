@@ -12,12 +12,14 @@ import {
 } from 'lucide-react';
 import { GLOBAL_COUNTRIES_GEO } from '../data/osintEvents';
 import { soundEffects } from '../services/soundEffects';
+import { TabSearchSection } from './TabSearchSection';
 
 interface CountryMonitorProps {
+  onPageAdded?: (page: { tab: string; query: string; heading: string; body: string }) => void;
   onSelectPipeline: (pipelineId: number) => void;
 }
 
-export const CountryMonitor: React.FC<CountryMonitorProps> = ({ onSelectPipeline }) => {
+export const CountryMonitor: React.FC<CountryMonitorProps> = ({ onSelectPipeline, onPageAdded }) => {
   const [search, setSearch] = useState('');
   const [selectedThreat, setSelectedThreat] = useState<string>('ALL');
 
@@ -34,6 +36,11 @@ export const CountryMonitor: React.FC<CountryMonitorProps> = ({ onSelectPipeline
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-8 py-8 text-slate-200">
+      {onPageAdded && (
+        <div className="px-4 sm:px-6 pt-4">
+          <TabSearchSection tab="Country Matrix" onPageAdded={onPageAdded} />
+        </div>
+      )}
       {/* Header */}
       <div className="border-b border-slate-800 pb-6">
         <div className="flex items-center space-x-2 text-xs font-mono text-cyan-400 mb-1">

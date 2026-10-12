@@ -20,12 +20,14 @@ import {
 import { OsintEvent } from '../data/osintEvents';
 import { soundEffects } from '../services/soundEffects';
 import { api } from '../services/apiBase';
+import { TabSearchSection } from './TabSearchSection';
 
 interface LiveIntelligenceFeedProps {
   onSelectPipeline: (pipelineId: number) => void;
+  onPageAdded?: (page: { tab: string; query: string; heading: string; body: string }) => void;
 }
 
-export const LiveIntelligenceFeed: React.FC<LiveIntelligenceFeedProps> = ({ onSelectPipeline }) => {
+export const LiveIntelligenceFeed: React.FC<LiveIntelligenceFeedProps> = ({ onSelectPipeline, onPageAdded }) => {
   const [events, setEvents] = useState<OsintEvent[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -125,6 +127,11 @@ export const LiveIntelligenceFeed: React.FC<LiveIntelligenceFeedProps> = ({ onSe
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-8 py-8 text-slate-200">
+      {onPageAdded && (
+        <div className="mb-6">
+          <TabSearchSection tab="Live On-Chain OSINT" onPageAdded={onPageAdded} />
+        </div>
+      )}
       {/* Feed Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
         <div>

@@ -11,6 +11,7 @@ import { ApiVaultModal } from './components/ApiVaultModal';
 import { LiveCryptoTicker } from './components/LiveCryptoTicker';
 import { MarketsView } from './components/MarketsView';
 import { PipelineItem } from './data/pipelinesData';
+import { BriefResearchPage } from './components/TabSearchSection';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'map' | 'pipelines' | 'osint' | 'markets' | 'scenario' | 'countries'>('map');
@@ -27,6 +28,15 @@ export default function App() {
 
   // API Key Vault Modal state
   const [isVaultOpen, setIsVaultOpen] = useState(false);
+
+  // Queued deep-research pages (from per-tab search) — appended to the next AI brief.
+  const [briefPages, setBriefPages] = useState<BriefResearchPage[]>([]);
+  const handlePageAdded = (page: BriefResearchPage) => {
+    setBriefPages((prev) => [...prev, page]);
+  };
+  const handleRemovePage = (idx: number) => {
+    setBriefPages((prev) => prev.filter((_, i) => i !== idx));
+  };
 
   // If visitor presses "Exit", the screen goes completely black
   if (disclaimerStatus === 'exited') {
@@ -91,7 +101,8 @@ export default function App() {
         {activeTab === 'map' && (
           <GlobalMap 
             onSelectPipeline={handleSelectPipeline} 
-            onOpenApiVault={() => setIsVaultOpen(true)} 
+            onOpenApiVault={() => setIsVaultOpen(true)}
+            onPageAdded={handlePageAdded}
           />
         )}
 
@@ -99,15 +110,16 @@ export default function App() {
           <PipelinesBriefingView
             onOpenPipelineModal={handleOpenPipelineModal}
             selectedPipelineId={selectedPipelineId}
+            onPageAdded={handlePageAdded}
           />
         )}
 
         {activeTab === 'osint' && (
-          <LiveIntelligenceFeed onSelectPipeline={handleSelectPipeline} />
+          <LiveIntelligenceFeed onSelectPipeline={handleSelectPipeline} onPageAdded={handlePageAdded} />
         )}
 
         {activeTab === 'markets' && (
-          <MarketsView />
+          <MarketsView onPageAdded={handlePageAdded} />
         )}
 
         {activeTab === 'scenario' && (
@@ -115,7 +127,7 @@ export default function App() {
         )}
 
         {activeTab === 'countries' && (
-          <CountryMonitor onSelectPipeline={handleSelectPipeline} />
+          <CountryMonitor onSelectPipeline={handleSelectPipeline} onPageAdded={handlePageAdded} />
         )}
       </main>
 
@@ -126,6 +138,9 @@ export default function App() {
         mode={modalMode}
         pipeline={modalPipeline}
         shockMultiplier={modalShockMultiplier}
+        extraPages={briefPages}
+        onRemoveExtraPage={handleRemovePage}
+        onClearExtraPages={() => setBriefPages([])}
       />
 
       {/* Mandatory Disclaimer Modal on Landing */}
