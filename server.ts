@@ -304,10 +304,54 @@ app.post('/api/ai/briefing', async (req, res) => {
       return res.status(503).json(AI_NOT_CONFIGURED);
     }
 
+    // Live context — the AI must ground every claim in THESE, never training data.
+    const livePrices = await getLiveSpotPrices();
+    const priceLines = Object.entries(livePrices)
+      .map(([k, v]) => `${k}: $${v.toLocaleString('en-US', { maximumFractionDigits: 2 })}`)
+      .join(', ');
+    let mempoolLine = '';
+    try {
+      const [hRes, fRes] = await Promise.all([
+        fetch('https://mempool.space/api/blocks/tip/height', { headers: { 'User-Agent': 'MISOCRYPTO-Platform' }, signal: AbortSignal.timeout(8000) }),
+        fetch('https://mempool.space/api/v1/fees/recommended', { headers: { 'User-Agent': 'MISOCRYPTO-Platform' }, signal: AbortSignal.timeout(8000) }),
+      ]);
+      if (hRes.ok && fRes.ok) {
+        const height = (await hRes.text()).trim();
+        const fees: any = await fRes.json();
+        mempoolLine = `Bitcoin tip block #${height}, fastest fee ${fees.fastestFee} sat/vB, half-hour ${fees.halfHourFee} sat/vB.`;
+      }
+    } catch { /* best-effort */ }
+    // Minimal price map for macro (getLiveMacro expects {price} objects)
+    const priceMap: Record<string, { price: number }> = {};
+    for (const [k, v] of Object.entries(livePrices)) priceMap[k] = { price: v };
+    const macro = await getLiveMacro(priceMap);
+    const macroLine = [
+      macro.totalMarketCap && `total crypto mcap ${macro.totalMarketCap}`,
+      macro.btcDominance && `BTC dominance ${macro.btcDominance}`,
+      macro.hashrate && `BTC hashrate ${macro.hashrate}`,
+      macro.defiTvl && `DeFi TVL ${macro.defiTvl}`,
+      macro.tetherPeg && `USDT peg ${macro.tetherPeg}`,
+    ].filter(Boolean).join(' · ');
+    const nowIso = new Date().toISOString();
+
+    const liveBlock = [
+      `\nLIVE MARKET DATA (fetched ${nowIso} — USE THESE EXACT VALUES. NEVER use prices or stats from your training data; they are stale):`,
+      priceLines ? `Spot prices: ${priceLines}.` : '',
+      mempoolLine ? `On-chain: ${mempoolLine}` : '',
+      macroLine ? `Macro: ${macroLine}.` : '',
+    ].filter(Boolean).join('\n');
+
     const prompt = `You are the Chief Quantitative Analyst of MISOCRYPTO, an elite institutional crypto, digital, and blockchain asset intelligence desk.
 Generate a comprehensive, institutional-grade digital asset intelligence briefing.
 Category focus: ${category || 'Crypto & On-Chain Macro Transmission Cascades'}.
 Region focus: ${focusRegion || 'Global Blockchain & Validator Networks'}.
+${liveBlock}
+
+GROUNDING RULES (violating these invalidates the briefing):
+- Every price, hashrate figure, fee rate, and market-cap number MUST come from the LIVE MARKET DATA block above, copied exactly.
+- Any mathForecast price target MUST show the arithmetic with the live baseline substituted (e.g. "$83,680 x 1.139 = $95,311.52"). LONG targets sit ABOVE the live price; SHORT targets BELOW.
+- Do NOT invent specific figures (no made-up hashrate drops, fee spikes, or liquidation volumes). If a live figure is missing, say "live figure unavailable" instead of guessing.
+- The "timestamp" field MUST be exactly: ${nowIso}
 
 Format your response strictly as valid JSON with the following structure:
 {
@@ -602,11 +646,30 @@ app.post('/api/ai/simulate-scenario', async (req, res) => {
       return res.status(503).json(AI_NOT_CONFIGURED);
     }
 
+    // Live baselines — the scenario escalates FROM these real conditions.
+    const scnPrices = await getLiveSpotPrices();
+    const scnPriceLines = Object.entries(scnPrices)
+      .map(([k, v]) => `${k}: $${v.toLocaleString('en-US', { maximumFractionDigits: 2 })}`)
+      .join(', ');
+    const scnPriceMap: Record<string, { price: number }> = {};
+    for (const [k, v] of Object.entries(scnPrices)) scnPriceMap[k] = { price: v };
+    const scnMacro = await getLiveMacro(scnPriceMap);
+    const scnNow = new Date().toISOString();
+
     const prompt = `You are a Senior Quantitative Wargame Analyst for Crypto, Digital, and Blockchain Systems.
 Analyze this escalation scenario:
 Scenario: "${scenarioTitle}"
 Details: "${scenarioDetails}"
 Escalation Level: ${escalationLevel || 3}/5
+
+LIVE BASELINE CONDITIONS (as of ${scnNow} — the scenario starts HERE, not from training-data memory):
+${scnPriceLines ? `Spot prices: ${scnPriceLines}.` : 'Spot prices unavailable.'}
+${[scnMacro.hashrate && `BTC hashrate ${scnMacro.hashrate}`, scnMacro.defiTvl && `DeFi TVL ${scnMacro.defiTvl}`, scnMacro.totalMarketCap && `total crypto mcap ${scnMacro.totalMarketCap}`].filter(Boolean).join(' · ')}
+
+GROUNDING RULES:
+- projectedAssetSwings MUST be computed as percentage moves FROM the live baseline prices above. State the baseline you used for each asset.
+- Do NOT invent baseline prices, hashrate figures, or TVL numbers. If a live figure is missing, say so.
+- Timeline events must be plausible escalations from CURRENT conditions, not generic templates.
 
 Simulate the on-chain systemic domino cascade, timeline progression, digital asset price dislocations, and activated crypto transmission pipelines.
 Output strictly valid JSON with this structure:

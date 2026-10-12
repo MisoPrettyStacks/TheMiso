@@ -16,12 +16,10 @@ import {
   ShieldCheck,
   ChevronDown,
   ChevronUp,
-  FileDown,
   Share2
 } from 'lucide-react';
 import { MACRO_PIPELINES, PIPELINE_CATEGORIES, PipelineItem } from '../data/pipelinesData';
 import { soundEffects } from '../services/soundEffects';
-import { downloadProjectSourceFiles } from '../services/sourceDownloader';
 
 /**
  * Convert a relative squeeze horizon ("1-3 Weeks", "12-72 Hours") into an
@@ -105,18 +103,6 @@ export const PipelinesBriefingView: React.FC<PipelinesBriefingViewProps> = ({
               <span>CONFIDENTIAL // QUANTITATIVE CRYPTO &amp; BLOCKCHAIN ASSET DESK</span>
             </div>
             <div className="flex items-center space-x-3 text-xs font-mono text-slate-400">
-              <button
-                onClick={() => {
-                  soundEffects.playPipelineOpen();
-                  downloadProjectSourceFiles();
-                }}
-                className="flex items-center space-x-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 hover:border-emerald-500/50 transition-colors"
-                title="Download all source files as a ZIP archive"
-              >
-                <FileDown className="w-3.5 h-3.5 text-emerald-400" />
-                <span>DOWNLOAD ALL SOURCE CODE (.ZIP)</span>
-              </button>
-              <span className="text-slate-600">|</span>
               <span className="text-amber-400 font-semibold">ON-CHAIN MACRO ARCS</span>
             </div>
           </div>
