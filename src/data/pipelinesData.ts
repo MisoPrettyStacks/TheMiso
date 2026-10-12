@@ -618,7 +618,7 @@ export const MACRO_PIPELINES: PipelineItem[] = [
         sector: "Layer 1 / Sovereign Asset",
         type: "LONG",
         beta: 1.00,
-        basePrice: 94820.00,
+        basePrice: 83680.00,
         entryLow: 92000.00,
         entryHigh: 94000.00,
         exitTarget: 108000.00,
