@@ -12,7 +12,9 @@ import {
   FileDown, 
   AlertCircle,
   Key,
-  Cpu
+  Cpu,
+  Save,
+  Printer
 } from 'lucide-react';
 import { PipelineItem } from '../data/pipelinesData';
 import { soundEffects } from '../services/soundEffects';
@@ -101,6 +103,78 @@ export const AIDossierModal: React.FC<AIDossierModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  /** Render the dossier as readable markdown text for save/print. */
+  const dossierToMarkdown = (): string => {
+    if (!data) return '';
+    const lines: string[] = [];
+    if (mode === 'BRIEFING') {
+      lines.push(`# ${data.title || 'Crypto Intelligence Dossier'}`);
+      lines.push(`_${data.classification || ''}_`);
+      lines.push(`Generated: ${data.timestamp || new Date().toISOString()}`);
+      lines.push('');
+      if (data.situationOverview) { lines.push('## Situational Awareness Summary'); lines.push(data.situationOverview); lines.push(''); }
+      if (data.criticalVulnerabilities?.length) { lines.push('## Critical Vulnerabilities'); data.criticalVulnerabilities.forEach((v: string) => lines.push(`- ${v}`)); lines.push(''); }
+      if (data.tacticalArbitrageOpportunities?.length) {
+        lines.push('## Tactical Arbitrage Opportunities');
+        data.tacticalArbitrageOpportunities.forEach((o: any) => {
+          lines.push(`### ${o.pipeline || 'Opportunity'}`);
+          lines.push(`Direction: ${o.direction || '—'}`);
+          lines.push(`Horizon: ${o.timeHorizon || '—'}`);
+          lines.push(`Math: ${o.mathForecast || '—'}`);
+          lines.push('');
+        });
+      }
+      if (data.defconStatus) { lines.push(`**${data.defconStatus}**`); lines.push(''); }
+      if (data.analystNote) { lines.push('## Analyst Note'); lines.push(data.analystNote); }
+    } else {
+      lines.push(`# ${data.pipeline || 'Pipeline Forecast'}`);
+      lines.push(`Generated: ${new Date().toISOString()}`);
+      lines.push('');
+      lines.push(`Target: ${data.calculatedTargetPrice || '—'} (${data.expectedReturnPct ?? '—'}%)`);
+      lines.push(`Entry: ${data.recommendedEntryRange || '—'} | Exit: ${data.recommendedExitTarget || '—'} | Stop: ${data.recommendedStopLoss || '—'}`);
+      lines.push('');
+      if (data.mathDerivation?.length) { lines.push('## Math Derivation'); data.mathDerivation.forEach((s: string) => lines.push(`- ${s}`)); lines.push(''); }
+      if (data.consistencyWarning) { lines.push(`> WARNING: ${data.consistencyWarning}`); lines.push(''); }
+    }
+    return lines.join('\n');
+  };
+
+  const handleSave = () => {
+    soundEffects.playTick();
+    const md = dossierToMarkdown();
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `misocrypto-${mode === 'BRIEFING' ? 'briefing' : 'dossier'}-${stamp}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrint = () => {
+    soundEffects.playTick();
+    const md = dossierToMarkdown()
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^- (.+)$/gm, '<li>$1</li>')
+      .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+      .replace(/\n/g, '<br>');
+    const w = window.open('', '_blank', 'width=800,height=900');
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><title>MISOCRYPTO Dossier</title>
+      <style>body{font-family:monospace;max-width:720px;margin:40px auto;padding:0 20px;color:#111}
+      h1{font-size:20px;border-bottom:2px solid #111;padding-bottom:8px}
+      h2{font-size:15px;margin-top:24px;color:#333}h3{font-size:13px}
+      blockquote{border-left:3px solid #c00;padding-left:12px;color:#900}</style>
+      </head><body>${md}<script>window.onload=()=>window.print()<\/script></body></html>`);
+    w.document.close();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
       <div className="w-full max-w-4xl bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -128,13 +202,31 @@ export const AIDossierModal: React.FC<AIDossierModalProps> = ({
 
           <div className="flex items-center space-x-2">
             {data && (
-              <button
-                onClick={handleCopy}
-                className="flex items-center space-x-1 px-2.5 py-1 rounded bg-slate-800 text-slate-300 hover:text-white text-xs font-mono"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? 'COPIED' : 'COPY MEMO'}</span>
-              </button>
+              <>
+                <button
+                  onClick={handleSave}
+                  className="flex items-center space-x-1 px-2.5 py-1 rounded bg-slate-800 text-slate-300 hover:text-white text-xs font-mono"
+                  title="Save dossier as markdown file"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>SAVE</span>
+                </button>
+                <button
+                  onClick={handlePrint}
+                  className="flex items-center space-x-1 px-2.5 py-1 rounded bg-slate-800 text-slate-300 hover:text-white text-xs font-mono"
+                  title="Print dossier"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>PRINT</span>
+                </button>
+                <button
+                  onClick={handleCopy}
+                  className="flex items-center space-x-1 px-2.5 py-1 rounded bg-slate-800 text-slate-300 hover:text-white text-xs font-mono"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copied ? 'COPIED' : 'COPY MEMO'}</span>
+                </button>
+              </>
             )}
             <button
               onClick={() => {
