@@ -34,7 +34,7 @@ export const LiveIntelligenceFeed: React.FC<LiveIntelligenceFeedProps> = ({ onSe
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [lastSynced, setLastSynced] = useState<string>(new Date().toLocaleTimeString());
-  const [mempoolStats, setMempoolStats] = useState<{ height?: number; fastestFee?: number } | null>(null);
+  const [mempoolStats, setMempoolStats] = useState<{ height?: number; fastestFee?: number; solSlotMs?: number } | null>(null);
 
   // Poll live primary RPCs and real-time open crypto feeds
   const fetchLiveFeeds = async () => {
@@ -49,7 +49,8 @@ export const LiveIntelligenceFeed: React.FC<LiveIntelligenceFeedProps> = ({ onSe
         if (data.mempoolTelemetry) {
           setMempoolStats({
             height: data.mempoolTelemetry.height,
-            fastestFee: data.mempoolTelemetry.fees?.fastestFee
+            fastestFee: data.mempoolTelemetry.fees?.fastestFee,
+            solSlotMs: data.mempoolTelemetry.solSlotMs ?? undefined,
           });
         }
 
@@ -182,13 +183,15 @@ export const LiveIntelligenceFeed: React.FC<LiveIntelligenceFeedProps> = ({ onSe
           )}
           <div className="hidden sm:flex items-center space-x-1">
             <span className="text-slate-400">SOL SLOT TIME:</span>
-            <span className="text-amber-400 font-bold">250ms (Upgraded)</span>
+            <span className="text-amber-400 font-bold">
+              {mempoolStats?.solSlotMs ? `${mempoolStats.solSlotMs}ms live` : '···'}
+            </span>
           </div>
         </div>
 
         <div className="flex items-center space-x-2 text-[11px] text-slate-400">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>PRIMARY SOURCES VERIFIED: <strong className="text-emerald-300">{primaryCount} ACTIVE</strong></span>
+          <span>PRIMARY DISPATCHES: <strong className="text-emerald-300">{primaryCount} LIVE</strong></span>
         </div>
       </div>
 

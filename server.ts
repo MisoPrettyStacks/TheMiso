@@ -1001,16 +1001,34 @@ app.get('/api/live/osint-feed', async (_req, res) => {
     let mempoolTelemetry: any = null;
 
     // 1. RAW PRIMARY SOURCE: Mempool.space Live Bitcoin Network RPC Telemetry
+    //    + Solana live slot time (public RPC performance samples)
     try {
-      const [blockHeightRes, feesRes] = await Promise.all([
+      const [blockHeightRes, feesRes, solRes] = await Promise.all([
         fetch('https://mempool.space/api/blocks/tip/height', { headers: { 'User-Agent': 'MISOCRYPTO-Platform' } }),
-        fetch('https://mempool.space/api/v1/fees/recommended', { headers: { 'User-Agent': 'MISOCRYPTO-Platform' } })
+        fetch('https://mempool.space/api/v1/fees/recommended', { headers: { 'User-Agent': 'MISOCRYPTO-Platform' } }),
+        fetch('https://solana-rpc.publicnode.com', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'User-Agent': 'MISOCRYPTO-Platform' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getRecentPerformanceSamples', params: [2] }),
+        }).catch(() => null),
       ]);
+
+      let solSlotMs: number | null = null;
+      if (solRes && solRes.ok) {
+        try {
+          const sj: any = await solRes.json();
+          const samples = sj.result || [];
+          if (samples.length > 0) {
+            const s = samples[0];
+            if (s.numSlots > 0) solSlotMs = Math.round((s.samplePeriodSecs * 1000) / s.numSlots);
+          }
+        } catch { /* best-effort */ }
+      }
 
       if (blockHeightRes.ok && feesRes.ok) {
         const height = await blockHeightRes.text();
         const fees = await feesRes.json();
-        mempoolTelemetry = { height: parseInt(height, 10), fees };
+        mempoolTelemetry = { height: parseInt(height, 10), fees, solSlotMs };
 
         liveDispatches.push({
           id: `raw-mempool-live-${height}`,
